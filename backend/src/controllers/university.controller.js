@@ -3,6 +3,8 @@ import Faculty from "../models/Faculty.js";
 import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { parseCSV } from "../services/csv.service.js";
+import fs from "fs";
 
 /* =========================
    UTILS
@@ -230,5 +232,124 @@ export const deleteFaculty = async (req, res) => {
   } catch (error) {
     console.error("Delete Faculty Error:", error.message);
     res.status(500).json({ message: "Failed to delete faculty" });
+  }
+};
+
+/* =========================
+   BULK UPLOAD STUDENTS (CSV)
+========================= */
+export const bulkUploadStudents = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    if (!universityId) {
+      return res.status(400).json({ message: "Invalid university user" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Parse CSV file
+    const csvData = await parseCSV(req.file.path);
+
+    if (csvData.length === 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: "CSV file is empty" });
+    }
+
+    // Validate CSV headers
+    const requiredHeaders = ["name", "department", "year"];
+    const csvHeaders = Object.keys(csvData[0]).map(h => h.toLowerCase().trim());
+    
+    const hasAllHeaders = requiredHeaders.every(header =>
+      csvHeaders.some(h => h === header)
+    );
+
+    if (!hasAllHeaders) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        message: `CSV must have columns: ${requiredHeaders.join(", ")}`
+      });
+    }
+
+    const createdStudents = [];
+    const errors = [];
+
+    // Process each row
+    for (let i = 0; i < csvData.length; i++) {
+      try {
+        const row = csvData[i];
+        
+        // Trim and normalize field names
+        const name = row.name?.trim() || row.Name?.trim();
+        const department = row.department?.trim() || row.Department?.trim();
+        const year = row.year?.trim() || row.Year?.trim();
+
+        // Validate required fields
+        if (!name || !department || !year) {
+          errors.push(`Row ${i + 1}: Missing required fields (name, department, year)`);
+          continue;
+        }
+
+        // Generate credentials
+        const enrollmentNo = generateEnrollmentNo(universityId);
+        const password = generatePassword();
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create student
+        const student = await Student.create({
+          universityId,
+          enrollmentNo,
+          name,
+          department,
+          year
+        });
+
+        // Create user account
+        await User.create({
+          role: "STUDENT",
+          loginId: enrollmentNo,
+          password: hashedPassword,
+          referenceId: student._id
+        });
+
+        createdStudents.push({
+          name,
+          enrollmentNo,
+          password,
+          department,
+          year
+        });
+      } catch (rowError) {
+        errors.push(`Row ${i + 1}: ${rowError.message}`);
+      }
+    }
+
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
+
+    res.status(201).json({
+      message: `Successfully created ${createdStudents.length} students`,
+      students: createdStudents,
+      errors: errors.length > 0 ? errors : null,
+      summary: {
+        total: csvData.length,
+        created: createdStudents.length,
+        failed: errors.length
+      }
+    });
+  } catch (error) {
+    console.error("Bulk Upload Students Error:", error.message);
+    
+    // Clean up file if it exists
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({
+      message: "Failed to process CSV file",
+      error: error.message
+    });
   }
 };
