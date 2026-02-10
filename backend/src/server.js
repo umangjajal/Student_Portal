@@ -60,7 +60,28 @@ app.set("io", io);
    SECURITY & MIDDLEWARES
 ========================= */
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL || "*" }));
+
+// Allow multiple client URLs for CORS
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "https://student-portal-pearl-tau.vercel.app",
+  // Add your deployed frontend URL here
+].filter(Boolean);
+
+app.use(cors({ 
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(mongoSanitize());
