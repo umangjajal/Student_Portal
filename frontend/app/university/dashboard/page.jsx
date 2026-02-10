@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Users, GraduationCap, ClipboardCheck, Bell } from 'lucide-react';
+import Link from 'next/link';
 
 export default function UniversityDashboard() {
   const [stats, setStats] = useState({
@@ -21,10 +22,10 @@ export default function UniversityDashboard() {
   }, []);
 
   const cards = [
-    { label: 'Students', value: stats.students, icon: Users },
-    { label: 'Faculty', value: stats.faculty, icon: GraduationCap },
-    { label: 'Courses', value: stats.courses, icon: ClipboardCheck },
-    { label: 'Active Notices', value: stats.notices, icon: Bell }
+    { label: 'Students', value: stats.students, icon: Users, link: '/university/students' },
+    { label: 'Faculty', value: stats.faculty, icon: GraduationCap, link: '/university/faculty' },
+    { label: 'Courses', value: stats.courses, icon: ClipboardCheck, link: '#' },
+    { label: 'Active Notices', value: stats.notices, icon: Bell, link: '/university/notices' }
   ];
 
   return (
@@ -33,16 +34,15 @@ export default function UniversityDashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {cards.map((c, i) => (
-          <div
-            key={i}
-            className="bg-white rounded-2xl shadow p-6 flex justify-between hover:shadow-lg transition"
-          >
-            <div>
-              <p className="text-sm text-gray-500">{c.label}</p>
-              <h2 className="text-2xl font-bold">{c.value}</h2>
+          <Link key={i} href={c.link || '#'}>
+            <div className="bg-white rounded-2xl shadow p-6 flex justify-between hover:shadow-lg transition cursor-pointer">
+              <div>
+                <p className="text-sm text-gray-500">{c.label}</p>
+                <h2 className="text-2xl font-bold">{c.value}</h2>
+              </div>
+              <c.icon className="w-10 h-10 text-blue-600" />
             </div>
-            <c.icon className="w-10 h-10 text-blue-600" />
-          </div>
+          </Link>
         ))}
       </div>
 

@@ -30,8 +30,6 @@ export default function LoginPage() {
       // ✅ STORE TOKEN FIRST
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("role", res.data.role);
-      
-      document.cookie = `token=${res.data.token}; path=/;`;
 
       // 🛑 Let browser commit storage before redirect
       setTimeout(() => {
@@ -51,7 +49,7 @@ export default function LoginPage() {
           default:
             router.replace("/auth/login");
         }
-      }, 0);
+      }, 50);
     } catch (err) {
       const message =
         err.response?.data?.message || "Invalid credentials";

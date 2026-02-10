@@ -4,24 +4,56 @@ import Link from "next/link";
 import { LayoutDashboard, University, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { jwtDecode } from "jwt-decode";
 
 export default function AdminLayout({ children }) {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "ADMIN")) {
-      router.replace("/auth/login");
+    // Check if user has correct role
+    if (loading) {
+      setIsChecking(true);
+      return;
     }
-  }, [user, loading, router]);
+
+    // If context has user with correct role, allow
+    if (user && user.role === "ADMIN") {
+      setIsAuthorized(true);
+      setIsChecking(false);
+      return;
+    }
+
+    // If context is empty, check localStorage directly
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        if (decoded.role === "ADMIN") {
+          setIsAuthorized(true);
+          setIsChecking(false);
+          return;
+        }
+      } catch (err) {
+        // Invalid token
+      }
+    }
+
+    // Not authorized
+    setIsAuthorized(false);
+    setIsChecking(false);
+    router.replace("/auth/login");
+  }, [user?.id, user?.role, loading, router]);
 
   const logout = () => {
     localStorage.removeItem("token");
     router.replace("/auth/login");
   };
 
-  if (loading) {
+  if (isChecking) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-gray-500">Checking admin access…</p>
@@ -29,7 +61,7 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  if (!user || user.role !== "ADMIN") return null;
+  if (!isAuthorized) return null;
 
   return (
     <div className="flex min-h-screen bg-gray-100">

@@ -100,3 +100,135 @@ export const createFaculty = async (req, res) => {
     res.status(500).json({ message: "Failed to create faculty" });
   }
 };
+
+/* =========================
+   GET STUDENTS
+========================= */
+export const getStudents = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const students = await Student.find({ universityId });
+    res.json(students);
+  } catch (error) {
+    console.error("Get Students Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch students" });
+  }
+};
+
+/* =========================
+   UPDATE STUDENT
+========================= */
+export const updateStudent = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { id } = req.params;
+
+    const student = await Student.findOneAndUpdate(
+      { _id: id, universityId },
+      req.body,
+      { new: true }
+    );
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    res.json({ message: "Student updated successfully", student });
+  } catch (error) {
+    console.error("Update Student Error:", error.message);
+    res.status(500).json({ message: "Failed to update student" });
+  }
+};
+
+/* =========================
+   DELETE STUDENT
+========================= */
+export const deleteStudent = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { id } = req.params;
+
+    const student = await Student.findOneAndDelete({
+      _id: id,
+      universityId
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Delete associated user account
+    await User.deleteOne({ referenceId: id, role: "STUDENT" });
+
+    res.json({ message: "Student deleted successfully" });
+  } catch (error) {
+    console.error("Delete Student Error:", error.message);
+    res.status(500).json({ message: "Failed to delete student" });
+  }
+};
+
+/* =========================
+   GET FACULTY
+========================= */
+export const getFaculty = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const faculty = await Faculty.find({ universityId });
+    res.json(faculty);
+  } catch (error) {
+    console.error("Get Faculty Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch faculty" });
+  }
+};
+
+/* =========================
+   UPDATE FACULTY
+========================= */
+export const updateFaculty = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { id } = req.params;
+
+    const faculty = await Faculty.findOneAndUpdate(
+      { _id: id, universityId },
+      req.body,
+      { new: true }
+    );
+
+    if (!faculty) {
+      return res.status(404).json({ message: "Faculty not found" });
+    }
+
+    res.json({ message: "Faculty updated successfully", faculty });
+  } catch (error) {
+    console.error("Update Faculty Error:", error.message);
+    res.status(500).json({ message: "Failed to update faculty" });
+  }
+};
+
+/* =========================
+   DELETE FACULTY
+========================= */
+export const deleteFaculty = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { id } = req.params;
+
+    const faculty = await Faculty.findOneAndDelete({
+      _id: id,
+      universityId
+    });
+
+    if (!faculty) {
+      return res.status(404).json({ message: "Faculty not found" });
+    }
+
+    // Delete associated user account
+    await User.deleteOne({ referenceId: id, role: "FACULTY" });
+
+    res.json({ message: "Faculty deleted successfully" });
+  } catch (error) {
+    console.error("Delete Faculty Error:", error.message);
+    res.status(500).json({ message: "Failed to delete faculty" });
+  }
+};
