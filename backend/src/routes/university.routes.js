@@ -8,9 +8,6 @@ import {
 
 const router = express.Router();
 
-/* =========================
-   UNIVERSITY → STUDENTS
-========================= */
 router.post(
   "/students",
   auth,
@@ -18,9 +15,6 @@ router.post(
   createStudent
 );
 
-/* =========================
-   UNIVERSITY → FACULTY
-========================= */
 router.post(
   "/faculty",
   auth,

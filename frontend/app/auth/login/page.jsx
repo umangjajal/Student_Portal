@@ -1,19 +1,23 @@
-'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import axios from '@/services/api';
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import api from "@/services/api";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const [form, setForm] = useState({
-    identifier: '',
-    password: ''
+    identifier: "",
+    password: ""
   });
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -21,28 +25,37 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await axios.post('/auth/login', form);
-      localStorage.setItem('token', res.data.token);
+      const res = await api.post("/auth/login", form);
 
-      // Role-based redirect
-      switch (res.data.role) {
-        case 'ADMIN':
-          router.push('/admin/dashboard');
-          break;
-        case 'UNIVERSITY':
-          router.push('/university/dashboard');
-          break;
-        case 'STUDENT':
-          router.push('/student/dashboard');
-          break;
-        case 'FACULTY':
-          router.push('/faculty/dashboard');
-          break;
-        default:
-          router.push('/');
-      }
+      // ✅ STORE TOKEN FIRST
+      localStorage.setItem("token", res.data.token);
+      localStorage.setItem("role", res.data.role);
+      
+      document.cookie = `token=${res.data.token}; path=/;`;
+
+      // 🛑 Let browser commit storage before redirect
+      setTimeout(() => {
+        switch (res.data.role) {
+          case "ADMIN":
+            router.replace("/admin/dashboard");
+            break;
+          case "UNIVERSITY":
+            router.replace("/university/dashboard");
+            break;
+          case "STUDENT":
+            router.replace("/student/dashboard");
+            break;
+          case "FACULTY":
+            router.replace("/faculty/dashboard");
+            break;
+          default:
+            router.replace("/auth/login");
+        }
+      }, 0);
     } catch (err) {
-      alert(err.response?.data?.message || 'Login failed');
+      const message =
+        err.response?.data?.message || "Invalid credentials";
+      alert(message);
     } finally {
       setLoading(false);
     }
@@ -58,18 +71,20 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             name="identifier"
+            value={form.identifier}
+            onChange={handleChange}
             placeholder="Email / Enrollment No / Faculty ID"
             required
-            onChange={handleChange}
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none"
           />
 
           <input
             name="password"
             type="password"
+            value={form.password}
+            onChange={handleChange}
             placeholder="Password"
             required
-            onChange={handleChange}
             className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none"
           />
 
@@ -78,14 +93,14 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition"
           >
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? "Logging in..." : "Login"}
           </button>
         </form>
 
         <p className="text-sm text-center text-gray-500 mt-4">
-          University not registered?{' '}
+          University not registered?{" "}
           <span
-            onClick={() => router.push('/auth/signup')}
+            onClick={() => router.push("/auth/signup")}
             className="text-indigo-600 cursor-pointer"
           >
             Register here
@@ -95,4 +110,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

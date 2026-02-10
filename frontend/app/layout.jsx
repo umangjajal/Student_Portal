@@ -1,15 +1,15 @@
-import './globals.css';
+import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata = {
-  title: 'General Student Portal',
-  description: 'University Management System'
+  title: "General Student Portal",
 };
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="bg-gray-100 text-gray-900">
-        {children}
+      <body>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

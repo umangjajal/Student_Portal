@@ -1,9 +1,10 @@
 'use client';
+
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 
-export default function withAdminAuth(Component) {
+export default function withUniversityAuth(Component) {
   return function ProtectedPage(props) {
     const router = useRouter();
 
@@ -17,13 +18,16 @@ export default function withAdminAuth(Component) {
 
       try {
         const decoded = jwtDecode(token);
-        if (decoded.role !== 'ADMIN') {
+
+        if (decoded.role !== 'UNIVERSITY') {
           router.replace('/auth/login');
         }
-      } catch {
+      } catch (error) {
+        console.error('Invalid token', error);
+        localStorage.clear();
         router.replace('/auth/login');
       }
-    }, []);
+    }, [router]);
 
     return <Component {...props} />;
   };

@@ -1,57 +1,59 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { LayoutDashboard, University, LogOut } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import Link from "next/link";
+import { LayoutDashboard, University, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/context/AuthContext";
+import { useEffect } from "react";
 
 export default function AdminLayout({ children }) {
   const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "ADMIN")) {
+      router.replace("/auth/login");
+    }
+  }, [user, loading, router]);
 
   const logout = () => {
-    localStorage.clear();
-    router.replace('/auth/login');
+    localStorage.removeItem("token");
+    router.replace("/auth/login");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Checking admin access…</p>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== "ADMIN") return null;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      
-      {/* Sidebar */}
       <aside className="w-64 bg-white shadow-xl">
         <div className="p-6 text-xl font-bold text-blue-600 border-b">
           Admin Panel
         </div>
 
         <nav className="px-4 py-4 space-y-2">
-          <Link
-            href="/admin/dashboard"
-            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-100 transition"
-          >
-            <LayoutDashboard size={18} />
-            Dashboard
+          <Link href="/admin/dashboard" className="nav-link">
+            <LayoutDashboard size={18} /> Dashboard
           </Link>
 
-          <Link
-            href="/admin/universities"
-            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-100 transition"
-          >
-            <University size={18} />
-            Universities
+          <Link href="/admin/universities" className="nav-link">
+            <University size={18} /> Universities
           </Link>
 
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-red-100 text-red-600 w-full text-left transition"
-          >
-            <LogOut size={18} />
-            Logout
+          <button onClick={logout} className="nav-link text-red-600">
+            <LogOut size={18} /> Logout
           </button>
         </nav>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        {children}
-      </main>
+      <main className="flex-1 p-8">{children}</main>
     </div>
   );
 }

@@ -1,12 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import axios from '@/services/api';
+import api from '@/services/api';
 
 export default function UniversitySignupPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  // ✅ All fields initialized as empty strings
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -19,7 +20,12 @@ export default function UniversitySignupPage() {
   });
 
   const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+
+    setForm(prev => ({
+      ...prev,
+      [name]: value ?? '' // ✅ never undefined
+    }));
   };
 
   const handleSignup = async (e) => {
@@ -27,7 +33,8 @@ export default function UniversitySignupPage() {
     setLoading(true);
 
     try {
-      await axios.post('/auth/university/signup', form);
+      const res = await api.post('/auth/university/signup', form);
+      alert(res.data.message || 'Signup successful');
       router.push('/auth/login');
     } catch (err) {
       alert(err.response?.data?.message || 'Signup failed');
@@ -43,7 +50,10 @@ export default function UniversitySignupPage() {
           University Registration
         </h1>
 
-        <form onSubmit={handleSignup} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form
+          onSubmit={handleSignup}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
           {[
             ['name', 'University Name'],
             ['email', 'Official Email'],
@@ -59,8 +69,9 @@ export default function UniversitySignupPage() {
               type={key === 'password' ? 'password' : 'text'}
               name={key}
               placeholder={label}
-              required
+              value={form[key]}           // ✅ always defined
               onChange={handleChange}
+              required
               className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-600 outline-none"
             />
           ))}
@@ -70,7 +81,7 @@ export default function UniversitySignupPage() {
             disabled={loading}
             className="md:col-span-2 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition"
           >
-            {loading ? 'Registering...' : 'Register University'}
+            {loading ? 'Registering…' : 'Register University'}
           </button>
         </form>
 

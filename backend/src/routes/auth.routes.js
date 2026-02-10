@@ -3,10 +3,14 @@ import { login, universitySignup } from "../controllers/auth.controller.js";
 
 const router = express.Router();
 
-// LOGIN (Admin / University / Student / Faculty)
-router.post("/login", login);
-
-// UNIVERSITY SIGNUP
+/* =========================
+   UNIVERSITY SIGNUP
+========================= */
 router.post("/university/signup", universitySignup);
+
+/* =========================
+   LOGIN (ALL ROLES)
+========================= */
+router.post("/login", login);
 
 export default router;

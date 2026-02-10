@@ -1,13 +1,13 @@
-'use client';
-import { useEffect, useState } from 'react';
-import api from '@/services/api';
-import withAdminAuth from '@/utils/withAdminAuth';
+"use client";
 
-function UniversitiesPage() {
+import { useEffect, useState } from "react";
+import api from "@/services/api";
+
+export default function UniversitiesPage() {
   const [universities, setUniversities] = useState([]);
 
   const load = async () => {
-    const res = await api.get('/admin/universities');
+    const res = await api.get("/admin/universities");
     setUniversities(res.data);
   };
 
@@ -24,18 +24,18 @@ function UniversitiesPage() {
     <div>
       <h1 className="text-2xl font-bold mb-6">University Approvals</h1>
 
-      <div className="bg-white rounded-xl shadow">
+      <div className="bg-white rounded-xl shadow overflow-hidden">
         <table className="w-full">
           <thead className="bg-gray-100">
             <tr>
-              <th className="p-3">Name</th>
+              <th className="p-3 text-left">Name</th>
               <th>Email</th>
               <th>Status</th>
               <th />
             </tr>
           </thead>
           <tbody>
-            {universities.map(u => (
+            {universities.map((u) => (
               <tr key={u._id} className="border-t">
                 <td className="p-3">{u.name}</td>
                 <td>{u.email}</td>
@@ -64,5 +64,3 @@ function UniversitiesPage() {
     </div>
   );
 }
-
-export default withAdminAuth(UniversitiesPage);
