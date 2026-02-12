@@ -107,13 +107,23 @@ app.use("/api/faculty", facultyRoutes);
 app.use("/api/otp", otpRoutes);
 
 /* =========================
-   HEALTH
+   HEALTH & DEBUG
 ========================= */
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
     message: "General Student Portal Backend Running",
     uptime: process.uptime()
+  });
+});
+
+// Debug endpoint to verify env and routes
+app.get("/debug", (req, res) => {
+  res.json({
+    env_loaded: !!process.env.JWT_SECRET,
+    jwt_secret_length: process.env.JWT_SECRET?.length || 0,
+    mongo_connected: !!process.env.MONGO_URI,
+    timestamp: new Date().toISOString()
   });
 });
 

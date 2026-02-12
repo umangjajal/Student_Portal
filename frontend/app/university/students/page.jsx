@@ -70,18 +70,30 @@ export default function StudentPage() {
 
     try {
       const res = await api.post('/university/students/bulk/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        responseType: 'blob' // Important: handle as blob for CSV file
       });
 
-      setUploadResults(res.data);
+      // Create blob and download CSV file
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `student-credentials-${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      // Show success message
+      alert('✅ Students imported successfully! Credentials CSV downloaded.');
+      
       setCsvFile(null);
       fetchStudents();
       
-      // Auto-hide after 5 seconds
+      // Auto-hide after 3 seconds
       setTimeout(() => {
         setShowBulkUpload(false);
-        setUploadResults(null);
-      }, 5000);
+      }, 3000);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to upload CSV');
     } finally {
@@ -156,6 +168,26 @@ export default function StudentPage() {
     setShowForm(true);
   };
 
+  // Export all student credentials as CSV
+  const exportAllCredentials = async () => {
+    try {
+      const res = await api.get('/university/students/export/credentials', {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `student-credentials-${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to export credentials');
+    }
+  };
+
   // Copy to clipboard
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -183,6 +215,12 @@ export default function StudentPage() {
             className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
           >
             <Upload size={18} /> Bulk Upload
+          </button>
+          <button
+            onClick={exportAllCredentials}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
+          >
+            <Download size={18} /> Export Credentials
           </button>
         </div>
       </div>

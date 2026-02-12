@@ -22,7 +22,13 @@ const userSchema = new mongoose.Schema(
     loginId: { type: String, unique: true, sparse: true }, // studentId / facultyId
     password: { type: String, required: true },
 
-    isActive: { type: Boolean, default: true }
+    isActive: { type: Boolean, default: true },
+    
+    // OTP and password reset
+    resetOTP: String,
+    resetOTPExpiry: Date,
+    resetToken: String,
+    resetTokenExpiry: Date
   },
   { timestamps: true }
 );

@@ -1,9 +1,10 @@
 import Student from "../models/Student.js";
 import Faculty from "../models/Faculty.js";
 import User from "../models/User.js";
+import Notification from "../models/Notification.js";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { parseCSV } from "../services/csv.service.js";
+import { parseCSV, generateCSV } from "../services/csv.service.js";
 import fs from "fs";
 
 /* =========================
@@ -238,6 +239,187 @@ export const deleteFaculty = async (req, res) => {
 /* =========================
    BULK UPLOAD STUDENTS (CSV)
 ========================= */
+/* =========================
+   GET STUDENTS WITH CREDENTIALS
+========================= */
+export const getStudentsWithCredentials = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const students = await Student.find({ universityId });
+    const studentsWithCreds = [];
+
+    for (const student of students) {
+      const user = await User.findOne({
+        referenceId: student._id,
+        role: "STUDENT"
+      });
+
+      if (user) {
+        studentsWithCreds.push({
+          studentId: student._id,
+          enrollmentNo: student.enrollmentNo,
+          name: student.name,
+          department: student.department,
+          year: student.year,
+          loginId: user.loginId,
+          hashedPassword: user.password,
+          isActive: user.isActive
+        });
+      }
+    }
+
+    res.json({
+      message: "Students with credentials retrieved successfully",
+      count: studentsWithCreds.length,
+      data: studentsWithCreds
+    });
+  } catch (error) {
+    console.error("Get Students with Credentials Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch student credentials" });
+  }
+};
+
+/* =========================
+   RESET SINGLE STUDENT PASSWORD
+========================= */
+export const resetStudentPassword = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { studentId } = req.params;
+
+    // Verify student belongs to this university
+    const student = await Student.findOne({
+      _id: studentId,
+      universityId
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    // Generate new password
+    const newPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password
+    const updatedUser = await User.findOneAndUpdate(
+      { referenceId: studentId, role: "STUDENT" },
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User account not found" });
+    }
+
+    res.json({
+      message: "Password reset successfully",
+      studentData: {
+        studentId: student._id,
+        enrollmentNo: student.enrollmentNo,
+        name: student.name,
+        newPassword: newPassword,
+        loginId: updatedUser.loginId
+      }
+    });
+  } catch (error) {
+    console.error("Reset Student Password Error:", error.message);
+    res.status(500).json({ message: "Failed to reset student password" });
+  }
+};
+
+/* =========================
+   RESET ALL STUDENT PASSWORDS
+========================= */
+export const resetAllStudentPasswords = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const students = await Student.find({ universityId });
+    const resetData = [];
+
+    for (const student of students) {
+      const newPassword = generatePassword();
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      const updatedUser = await User.findOneAndUpdate(
+        { referenceId: student._id, role: "STUDENT" },
+        { password: hashedPassword },
+        { new: true }
+      );
+
+      if (updatedUser) {
+        resetData.push({
+          enrollmentNo: student.enrollmentNo,
+          name: student.name,
+          loginId: updatedUser.loginId,
+          newPassword: newPassword,
+          department: student.department,
+          year: student.year
+        });
+      }
+    }
+
+    res.json({
+      message: "All passwords reset successfully",
+      count: resetData.length,
+      data: resetData
+    });
+  } catch (error) {
+    console.error("Reset All Passwords Error:", error.message);
+    res.status(500).json({ message: "Failed to reset all passwords" });
+  }
+};
+
+/* =========================
+   EXPORT STUDENT CREDENTIALS
+========================= */
+export const exportStudentCredentials = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const students = await Student.find({ universityId });
+    const credentials = [];
+
+    for (const student of students) {
+      const user = await User.findOne({
+        referenceId: student._id,
+        role: "STUDENT"
+      });
+
+      if (user) {
+        credentials.push({
+          enrollmentNo: student.enrollmentNo,
+          name: student.name,
+          department: student.department,
+          year: student.year,
+          loginId: user.loginId,
+          isActive: user.isActive
+        });
+      }
+    }
+
+    // Generate and return as CSV
+    if (credentials.length === 0) {
+      return res.status(404).json({ message: "No student credentials found" });
+    }
+
+    const csvHeaders = ["enrollmentNo", "name", "department", "year", "loginId", "isActive"];
+    const credentialsCSV = generateCSV(credentials, csvHeaders);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="student-credentials-${Date.now()}.csv"`
+    );
+    res.send(credentialsCSV);
+  } catch (error) {
+    console.error("Export Credentials Error:", error.message);
+    res.status(500).json({ message: "Failed to export credentials" });
+  }
+};
+
 export const bulkUploadStudents = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -329,13 +511,29 @@ export const bulkUploadStudents = async (req, res) => {
     // Clean up uploaded file
     fs.unlinkSync(req.file.path);
 
-    res.status(201).json({
-      message: `Successfully created ${createdStudents.length} students`,
-      students: createdStudents,
-      errors: errors.length > 0 ? errors : null,
+    // Generate CSV with credentials
+    if (createdStudents.length > 0) {
+      const csvHeaders = ["enrollmentNo", "name", "department", "year", "password"];
+      const credentialsCSV = generateCSV(createdStudents, csvHeaders);
+      
+      // Send response with CSV file download
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="student-credentials-${Date.now()}.csv"`
+      );
+      
+      // Return JSON metadata + CSV attachment in response body
+      return res.send(credentialsCSV);
+    }
+
+    // Fallback response if no students created
+    res.status(400).json({
+      message: "No students created. Check CSV file and try again.",
+      errors,
       summary: {
         total: csvData.length,
-        created: createdStudents.length,
+        created: 0,
         failed: errors.length
       }
     });
@@ -351,5 +549,171 @@ export const bulkUploadStudents = async (req, res) => {
       message: "Failed to process CSV file",
       error: error.message
     });
+  }
+};
+
+/* =========================
+   NOTIFICATIONS (UPDATES)
+========================= */
+
+/* CREATE NEW UPDATE/NOTIFICATION */
+export const createNotification = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { title, message, roleTarget, priority } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ message: "Title and message are required" });
+    }
+
+    const notification = await Notification.create({
+      universityId,
+      title,
+      message,
+      roleTarget: roleTarget || "ALL",
+      priority: priority || "MEDIUM",
+      isActive: true
+    });
+
+    res.status(201).json({
+      message: "Update created successfully",
+      data: notification
+    });
+  } catch (error) {
+    console.error("Create Notification Error:", error.message);
+    res.status(500).json({ message: "Failed to create update" });
+  }
+};
+
+/* GET ALL UPDATES FOR UNIVERSITY */
+export const getUniversityNotifications = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const notifications = await Notification.find({ universityId })
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    res.json({
+      message: "University updates retrieved successfully",
+      count: notifications.length,
+      data: notifications
+    });
+  } catch (error) {
+    console.error("Get Notifications Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch updates" });
+  }
+};
+
+/* GET SINGLE UPDATE DETAIL */
+export const getNotificationDetail = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { notificationId } = req.params;
+
+    const notification = await Notification.findOne({
+      _id: notificationId,
+      universityId
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: "Update not found" });
+    }
+
+    res.json({
+      message: "Update details retrieved successfully",
+      data: notification
+    });
+  } catch (error) {
+    console.error("Get Notification Detail Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch update details" });
+  }
+};
+
+/* UPDATE NOTIFICATION */
+export const updateNotification = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { notificationId } = req.params;
+    const { title, message, roleTarget, priority, isActive } = req.body;
+
+    const notification = await Notification.findOneAndUpdate(
+      { _id: notificationId, universityId },
+      { title, message, roleTarget, priority, isActive },
+      { new: true }
+    );
+
+    if (!notification) {
+      return res.status(404).json({ message: "Update not found" });
+    }
+
+    res.json({
+      message: "Update modified successfully",
+      data: notification
+    });
+  } catch (error) {
+    console.error("Update Notification Error:", error.message);
+    res.status(500).json({ message: "Failed to update notification" });
+  }
+};
+
+/* DELETE NOTIFICATION */
+export const deleteNotification = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { notificationId } = req.params;
+
+    const notification = await Notification.findOneAndDelete({
+      _id: notificationId,
+      universityId
+    });
+
+    if (!notification) {
+      return res.status(404).json({ message: "Update not found" });
+    }
+
+    res.json({
+      message: "Update deleted successfully"
+    });
+  } catch (error) {
+    console.error("Delete Notification Error:", error.message);
+    res.status(500).json({ message: "Failed to delete update" });
+  }
+};
+
+/* =========================
+   DASHBOARD STATS (AGGREGATED)
+========================= */
+export const getDashboardStats = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    if (!universityId) {
+      return res.status(400).json({ message: "Invalid university user" });
+    }
+
+    // Fetch all data in parallel
+    const [studentsCount, facultyCount, activeNotifications, allNotifications] = await Promise.all([
+      Student.countDocuments({ universityId }),
+      Faculty.countDocuments({ universityId }),
+      Notification.countDocuments({ universityId, isActive: true }),
+      Notification.find({ universityId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+    ]);
+
+    res.json({
+      message: "Dashboard stats retrieved successfully",
+      data: {
+        totalStudents: studentsCount,
+        totalFaculty: facultyCount,
+        activeNotifications: activeNotifications,
+        totalCourses: 0,
+        recentNotifications: allNotifications
+      }
+    });
+  } catch (error) {
+    console.error("Dashboard Stats Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch dashboard stats" });
   }
 };

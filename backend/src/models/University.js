@@ -52,6 +52,12 @@ const universitySchema = new mongoose.Schema(
       trim: true
     },
 
+    phone: String,
+    website: String,
+    logo: String,
+    avatar: String,
+    contactPerson: String,
+
     approved: {
       type: Boolean,
       default: false

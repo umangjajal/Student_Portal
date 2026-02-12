@@ -15,8 +15,18 @@ const studentSchema = new mongoose.Schema(
     },
 
     name: { type: String, required: true },
+    email: { type: String, unique: true, sparse: true },
+    phone: { type: String },
     department: String,
-    year: String
+    year: String,
+    dateOfBirth: Date,
+    gender: { type: String, enum: ["MALE", "FEMALE", "OTHER"] },
+    address: String,
+    city: String,
+    state: String,
+    postalCode: String,
+    avatar: { type: String, default: null },
+    bio: String
   },
   { timestamps: true }
 );
