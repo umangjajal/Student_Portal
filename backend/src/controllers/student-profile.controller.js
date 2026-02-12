@@ -73,6 +73,12 @@ export const updateStudentProfile = async (req, res) => {
 ========================= */
 export const requestPasswordReset = async (req, res) => {
   try {
+    // Verify email credentials are configured
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      console.error("Email credentials not configured");
+      return res.status(500).json({ message: "Email service not configured. Please contact administrator." });
+    }
+
     const user = await User.findOne({ referenceId: req.user.referenceId });
 
     if (!user) {
@@ -97,7 +103,16 @@ export const requestPasswordReset = async (req, res) => {
       return res.status(400).json({ message: "No email address on file" });
     }
 
-    await sendOTPEmail(emailRecipient, otp, student.name);
+    try {
+      await sendOTPEmail(emailRecipient, otp, student.name || "Student");
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError.message);
+      return res.json({
+        message: "OTP saved (email delivery may be delayed)",
+        email: emailRecipient,
+        warning: "Check your email including spam folder"
+      });
+    }
 
     res.json({
       message: "OTP sent to your email",
@@ -105,7 +120,7 @@ export const requestPasswordReset = async (req, res) => {
     });
   } catch (error) {
     console.error("Request Password Reset Error:", error.message);
-    res.status(500).json({ message: "Failed to send OTP" });
+    res.status(500).json({ message: "Failed to send OTP: " + error.message });
   }
 };
 
