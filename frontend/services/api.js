@@ -8,19 +8,23 @@ const api = axios.create({
   baseURL,
 });
 
-/* =====================================
+/* =========================
    REQUEST INTERCEPTOR
-===================================== */
+========================= */
 api.interceptors.request.use(
   (config) => {
-    // Prevent SSR localStorage error
     if (typeof window !== "undefined") {
       try {
         const sessions =
           JSON.parse(localStorage.getItem("sessions")) || {};
 
-        const activeRole =
+        let activeRole =
           localStorage.getItem("activeRole");
+
+        if (!activeRole && Object.keys(sessions).length === 1) {
+          activeRole = Object.keys(sessions)[0];
+          localStorage.setItem("activeRole", activeRole);
+        }
 
         const token = sessions[activeRole];
 
@@ -37,10 +41,9 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-/* =====================================
-   RESPONSE INTERCEPTOR (Optional)
-   Auto logout if token expired
-===================================== */
+/* =========================
+   RESPONSE INTERCEPTOR
+========================= */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -48,8 +51,6 @@ api.interceptors.response.use(
       error.response &&
       error.response.status === 401
     ) {
-      console.warn("Session expired or unauthorized");
-
       if (typeof window !== "undefined") {
         const activeRole =
           localStorage.getItem("activeRole");
@@ -57,7 +58,6 @@ api.interceptors.response.use(
         const sessions =
           JSON.parse(localStorage.getItem("sessions")) || {};
 
-        // Remove only active role session
         delete sessions[activeRole];
 
         localStorage.setItem(
