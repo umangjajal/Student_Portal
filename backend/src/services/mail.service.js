@@ -9,11 +9,22 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Test email connection on startup
+transporter.verify((error, success) => {
+  if (error) {
+    console.error("❌ Email Transporter Error:", error.message);
+  } else {
+    console.log("✅ Email Transporter Ready");
+  }
+});
+
 /* =========================
    SEND OTP EMAIL
 ========================= */
 export const sendOTPEmail = async (email, otp, userName) => {
   try {
+    console.log(`📧 Attempting to send OTP to: ${email}`);
+    
     const subject = "Password Reset OTP - Student Portal";
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f4f4f4;">
@@ -57,10 +68,13 @@ export const sendOTPEmail = async (email, otp, userName) => {
       html: htmlContent
     });
 
+    console.log(`✅ OTP Email sent successfully to ${email} (Message ID: ${result.messageId})`);
     return result;
   } catch (error) {
-    console.error("Send OTP Email Error:", error);
-    throw new Error("Failed to send OTP email");
+    console.error("❌ Send OTP Email Error:", error.message);
+    console.error("Error Code:", error.code);
+    console.error("Email:", email);
+    throw new Error(`Email failed: ${error.message}`);
   }
 };
 

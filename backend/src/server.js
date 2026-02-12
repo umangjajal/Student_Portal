@@ -123,8 +123,47 @@ app.get("/debug", (req, res) => {
     env_loaded: !!process.env.JWT_SECRET,
     jwt_secret_length: process.env.JWT_SECRET?.length || 0,
     mongo_connected: !!process.env.MONGO_URI,
+    email_user: process.env.EMAIL_USER || "NOT SET",
+    email_pass_length: process.env.EMAIL_PASS?.length || 0,
     timestamp: new Date().toISOString()
   });
+});
+
+// Test email endpoint
+app.post("/test-email", async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: "Email address required" });
+    }
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res.status(500).json({ 
+        message: "Email credentials not configured",
+        email_user: !!process.env.EMAIL_USER,
+        email_pass: !!process.env.EMAIL_PASS
+      });
+    }
+
+    const { sendOTPEmail } = await import("./services/mail.service.js");
+    
+    await sendOTPEmail(email, "123456", "Test User");
+
+    res.json({
+      message: "✅ Test email sent successfully!",
+      email,
+      timestamp: new Date().toISOString(),
+      note: "Check your inbox and spam folder"
+    });
+  } catch (error) {
+    console.error("Test Email Error:", error);
+    res.status(500).json({
+      message: "❌ Failed to send test email",
+      error: error.message,
+      details: "Check backend console for more details"
+    });
+  }
 });
 
 /* =========================
