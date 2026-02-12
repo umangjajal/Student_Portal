@@ -27,29 +27,48 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/login", form);
 
-      // ✅ STORE TOKEN FIRST
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("role", res.data.role);
+      const { token, role } = res.data;
 
-      // 🛑 Let browser commit storage before redirect
-      setTimeout(() => {
-        switch (res.data.role) {
-          case "ADMIN":
-            router.replace("/admin/dashboard");
-            break;
-          case "UNIVERSITY":
-            router.replace("/university/dashboard");
-            break;
-          case "STUDENT":
-            router.replace("/student/dashboard");
-            break;
-          case "FACULTY":
-            router.replace("/faculty/dashboard");
-            break;
-          default:
-            router.replace("/auth/login");
-        }
-      }, 50);
+      /* =========================
+         MULTI ROLE SESSION STORAGE
+      ========================= */
+
+      // Get existing sessions
+      const existingSessions =
+        JSON.parse(localStorage.getItem("sessions")) || {};
+
+      // Save token under role key
+      existingSessions[role] = token;
+
+      // Save updated sessions
+      localStorage.setItem(
+        "sessions",
+        JSON.stringify(existingSessions)
+      );
+
+      // Set active role
+      localStorage.setItem("activeRole", role);
+
+      /* =========================
+         REDIRECT BASED ON ROLE
+      ========================= */
+
+      switch (role) {
+        case "ADMIN":
+          router.replace("/admin/dashboard");
+          break;
+        case "UNIVERSITY":
+          router.replace("/university/dashboard");
+          break;
+        case "STUDENT":
+          router.replace("/student/dashboard");
+          break;
+        case "FACULTY":
+          router.replace("/faculty/dashboard");
+          break;
+        default:
+          router.replace("/auth/login");
+      }
     } catch (err) {
       const message =
         err.response?.data?.message || "Invalid credentials";
