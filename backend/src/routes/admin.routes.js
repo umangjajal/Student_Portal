@@ -8,7 +8,19 @@ import {
 
 const router = express.Router();
 
-router.get("/universities", auth, roleCheck("ADMIN"), getUniversities);
+/* =====================================
+   GET ALL UNIVERSITIES (ADMIN)
+===================================== */
+router.get(
+  "/universities",
+  auth,
+  roleCheck("ADMIN"),
+  getUniversities
+);
+
+/* =====================================
+   APPROVE UNIVERSITY (ADMIN)
+===================================== */
 router.put(
   "/universities/:id/approve",
   auth,
