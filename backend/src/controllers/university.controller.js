@@ -19,6 +19,10 @@ const generateEnrollmentNo = (universityId) => {
   return `UNI-${year}-${universityId.toString().slice(-4)}-${rand}`;
 };
 
+const generateFacultyId = () => {
+  return `FAC-${crypto.randomInt(1000, 9999)}`;
+};
+
 /* =========================
    CREATE STUDENT
 ========================= */
@@ -59,48 +63,6 @@ export const createStudent = async (req, res) => {
   } catch (error) {
     console.error("Create Student Error:", error.message);
     res.status(500).json({ message: "Failed to create student" });
-  }
-};
-
-/* =========================
-   CREATE FACULTY
-========================= */
-export const createFaculty = async (req, res) => {
-  try {
-    const universityId = req.user.referenceId;
-
-    if (!universityId) {
-      return res.status(400).json({ message: "Invalid university user" });
-    }
-
-    const facultyId = `FAC-${crypto.randomInt(1000, 9999)}`;
-    const password = generatePassword();
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const faculty = await Faculty.create({
-      universityId,
-      facultyId,
-      name: req.body.name,
-      department: req.body.department
-    });
-
-    await User.create({
-      role: "FACULTY",
-      loginId: facultyId,
-      password: hashedPassword,
-      referenceId: faculty._id
-    });
-
-    res.status(201).json({
-      message: "Faculty created successfully",
-      credentials: {
-        facultyId,
-        password
-      }
-    });
-  } catch (error) {
-    console.error("Create Faculty Error:", error.message);
-    res.status(500).json({ message: "Failed to create faculty" });
   }
 };
 
@@ -171,6 +133,331 @@ export const deleteStudent = async (req, res) => {
 };
 
 /* =========================
+   STUDENT CREDENTIALS & BULK
+========================= */
+
+/* GET STUDENTS WITH CREDENTIALS */
+export const getStudentsWithCredentials = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const students = await Student.find({ universityId });
+    const studentsWithCreds = [];
+
+    for (const student of students) {
+      const user = await User.findOne({
+        referenceId: student._id,
+        role: "STUDENT"
+      });
+
+      if (user) {
+        studentsWithCreds.push({
+          studentId: student._id,
+          enrollmentNo: student.enrollmentNo,
+          name: student.name,
+          department: student.department,
+          year: student.year,
+          loginId: user.loginId,
+          hashedPassword: user.password,
+          isActive: user.isActive
+        });
+      }
+    }
+
+    res.json({
+      message: "Students with credentials retrieved successfully",
+      count: studentsWithCreds.length,
+      data: studentsWithCreds
+    });
+  } catch (error) {
+    console.error("Get Students with Credentials Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch student credentials" });
+  }
+};
+
+/* RESET SINGLE STUDENT PASSWORD */
+export const resetStudentPassword = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+    const { studentId } = req.params;
+
+    const student = await Student.findOne({
+      _id: studentId,
+      universityId
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const newPassword = generatePassword();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const updatedUser = await User.findOneAndUpdate(
+      { referenceId: studentId, role: "STUDENT" },
+      { password: hashedPassword },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User account not found" });
+    }
+
+    res.json({
+      message: "Password reset successfully",
+      studentData: {
+        studentId: student._id,
+        enrollmentNo: student.enrollmentNo,
+        name: student.name,
+        newPassword: newPassword,
+        loginId: updatedUser.loginId
+      }
+    });
+  } catch (error) {
+    console.error("Reset Student Password Error:", error.message);
+    res.status(500).json({ message: "Failed to reset student password" });
+  }
+};
+
+/* RESET ALL STUDENT PASSWORDS */
+export const resetAllStudentPasswords = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const students = await Student.find({ universityId });
+    const resetData = [];
+
+    for (const student of students) {
+      const newPassword = generatePassword();
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      const updatedUser = await User.findOneAndUpdate(
+        { referenceId: student._id, role: "STUDENT" },
+        { password: hashedPassword },
+        { new: true }
+      );
+
+      if (updatedUser) {
+        resetData.push({
+          enrollmentNo: student.enrollmentNo,
+          name: student.name,
+          loginId: updatedUser.loginId,
+          newPassword: newPassword,
+          department: student.department,
+          year: student.year
+        });
+      }
+    }
+
+    res.json({
+      message: "All passwords reset successfully",
+      count: resetData.length,
+      data: resetData
+    });
+  } catch (error) {
+    console.error("Reset All Passwords Error:", error.message);
+    res.status(500).json({ message: "Failed to reset all passwords" });
+  }
+};
+
+/* EXPORT STUDENT CREDENTIALS */
+export const exportStudentCredentials = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    const students = await Student.find({ universityId });
+    const credentials = [];
+
+    for (const student of students) {
+      const user = await User.findOne({
+        referenceId: student._id,
+        role: "STUDENT"
+      });
+
+      if (user) {
+        credentials.push({
+          enrollmentNo: student.enrollmentNo,
+          name: student.name,
+          department: student.department,
+          year: student.year,
+          loginId: user.loginId,
+          isActive: user.isActive
+        });
+      }
+    }
+
+    if (credentials.length === 0) {
+      return res.status(404).json({ message: "No student credentials found" });
+    }
+
+    const csvHeaders = ["enrollmentNo", "name", "department", "year", "loginId", "isActive"];
+    const credentialsCSV = generateCSV(credentials, csvHeaders);
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="student-credentials-${Date.now()}.csv"`
+    );
+    res.send(credentialsCSV);
+  } catch (error) {
+    console.error("Export Credentials Error:", error.message);
+    res.status(500).json({ message: "Failed to export credentials" });
+  }
+};
+
+/* BULK UPLOAD STUDENTS */
+export const bulkUploadStudents = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    if (!universityId) {
+      return res.status(400).json({ message: "Invalid university user" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const csvData = await parseCSV(req.file.path);
+
+    if (csvData.length === 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ message: "CSV file is empty" });
+    }
+
+    const requiredHeaders = ["name", "department", "year"];
+    const csvHeaders = Object.keys(csvData[0]).map(h => h.toLowerCase().trim());
+    
+    const hasAllHeaders = requiredHeaders.every(header =>
+      csvHeaders.some(h => h === header)
+    );
+
+    if (!hasAllHeaders) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        message: `CSV must have columns: ${requiredHeaders.join(", ")}`
+      });
+    }
+
+    const createdStudents = [];
+    const errors = [];
+
+    for (let i = 0; i < csvData.length; i++) {
+      try {
+        const row = csvData[i];
+        
+        const name = row.name?.trim() || row.Name?.trim();
+        const department = row.department?.trim() || row.Department?.trim();
+        const year = row.year?.trim() || row.Year?.trim();
+
+        if (!name || !department || !year) {
+          errors.push(`Row ${i + 1}: Missing required fields`);
+          continue;
+        }
+
+        const enrollmentNo = generateEnrollmentNo(universityId);
+        const password = generatePassword();
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const student = await Student.create({
+          universityId,
+          enrollmentNo,
+          name,
+          department,
+          year
+        });
+
+        await User.create({
+          role: "STUDENT",
+          loginId: enrollmentNo,
+          password: hashedPassword,
+          referenceId: student._id
+        });
+
+        createdStudents.push({
+          name,
+          enrollmentNo,
+          password,
+          department,
+          year
+        });
+      } catch (rowError) {
+        errors.push(`Row ${i + 1}: ${rowError.message}`);
+      }
+    }
+
+    fs.unlinkSync(req.file.path);
+
+    if (createdStudents.length > 0) {
+      const csvHeaders = ["enrollmentNo", "name", "department", "year", "password"];
+      const credentialsCSV = generateCSV(createdStudents, csvHeaders);
+      
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="student-credentials-${Date.now()}.csv"`
+      );
+      
+      return res.send(credentialsCSV);
+    }
+
+    res.status(400).json({
+      message: "No students created. Check CSV file and try again.",
+      errors,
+      summary: { total: csvData.length, created: 0, failed: errors.length }
+    });
+  } catch (error) {
+    console.error("Bulk Upload Students Error:", error.message);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ message: "Failed to process CSV file", error: error.message });
+  }
+};
+
+/* =========================
+   CREATE FACULTY
+========================= */
+export const createFaculty = async (req, res) => {
+  try {
+    const universityId = req.user.referenceId;
+
+    if (!universityId) {
+      return res.status(400).json({ message: "Invalid university user" });
+    }
+
+    const facultyId = generateFacultyId();
+    const password = generatePassword();
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const faculty = await Faculty.create({
+      universityId,
+      facultyId,
+      name: req.body.name,
+      department: req.body.department
+    });
+
+    await User.create({
+      role: "FACULTY",
+      loginId: facultyId,
+      password: hashedPassword,
+      referenceId: faculty._id
+    });
+
+    res.status(201).json({
+      message: "Faculty created successfully",
+      credentials: {
+        facultyId,
+        password
+      }
+    });
+  } catch (error) {
+    console.error("Create Faculty Error:", error.message);
+    res.status(500).json({ message: "Failed to create faculty" });
+  }
+};
+
+/* =========================
    GET FACULTY
 ========================= */
 export const getFaculty = async (req, res) => {
@@ -237,31 +524,29 @@ export const deleteFaculty = async (req, res) => {
 };
 
 /* =========================
-   BULK UPLOAD STUDENTS (CSV)
+   FACULTY CREDENTIALS & BULK
 ========================= */
-/* =========================
-   GET STUDENTS WITH CREDENTIALS
-========================= */
-export const getStudentsWithCredentials = async (req, res) => {
+
+/* GET FACULTY WITH CREDENTIALS */
+export const getFacultyWithCredentials = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
 
-    const students = await Student.find({ universityId });
-    const studentsWithCreds = [];
+    const faculties = await Faculty.find({ universityId });
+    const facultyWithCreds = [];
 
-    for (const student of students) {
+    for (const faculty of faculties) {
       const user = await User.findOne({
-        referenceId: student._id,
-        role: "STUDENT"
+        referenceId: faculty._id,
+        role: "FACULTY"
       });
 
       if (user) {
-        studentsWithCreds.push({
-          studentId: student._id,
-          enrollmentNo: student.enrollmentNo,
-          name: student.name,
-          department: student.department,
-          year: student.year,
+        facultyWithCreds.push({
+          facultyId: faculty._id,
+          systemId: faculty.facultyId,
+          name: faculty.name,
+          department: faculty.department,
           loginId: user.loginId,
           hashedPassword: user.password,
           isActive: user.isActive
@@ -270,41 +555,36 @@ export const getStudentsWithCredentials = async (req, res) => {
     }
 
     res.json({
-      message: "Students with credentials retrieved successfully",
-      count: studentsWithCreds.length,
-      data: studentsWithCreds
+      message: "Faculty with credentials retrieved successfully",
+      count: facultyWithCreds.length,
+      data: facultyWithCreds
     });
   } catch (error) {
-    console.error("Get Students with Credentials Error:", error.message);
-    res.status(500).json({ message: "Failed to fetch student credentials" });
+    console.error("Get Faculty with Credentials Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch faculty credentials" });
   }
 };
 
-/* =========================
-   RESET SINGLE STUDENT PASSWORD
-========================= */
-export const resetStudentPassword = async (req, res) => {
+/* RESET SINGLE FACULTY PASSWORD */
+export const resetFacultyPassword = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
-    const { studentId } = req.params;
+    const { facultyId } = req.params;
 
-    // Verify student belongs to this university
-    const student = await Student.findOne({
-      _id: studentId,
+    const faculty = await Faculty.findOne({
+      _id: facultyId,
       universityId
     });
 
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+    if (!faculty) {
+      return res.status(404).json({ message: "Faculty not found" });
     }
 
-    // Generate new password
     const newPassword = generatePassword();
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update user password
     const updatedUser = await User.findOneAndUpdate(
-      { referenceId: studentId, role: "STUDENT" },
+      { referenceId: facultyId, role: "FACULTY" },
       { password: hashedPassword },
       { new: true }
     );
@@ -315,112 +595,106 @@ export const resetStudentPassword = async (req, res) => {
 
     res.json({
       message: "Password reset successfully",
-      studentData: {
-        studentId: student._id,
-        enrollmentNo: student.enrollmentNo,
-        name: student.name,
+      facultyData: {
+        facultyId: faculty._id,
+        systemId: faculty.facultyId,
+        name: faculty.name,
         newPassword: newPassword,
         loginId: updatedUser.loginId
       }
     });
   } catch (error) {
-    console.error("Reset Student Password Error:", error.message);
-    res.status(500).json({ message: "Failed to reset student password" });
+    console.error("Reset Faculty Password Error:", error.message);
+    res.status(500).json({ message: "Failed to reset faculty password" });
   }
 };
 
-/* =========================
-   RESET ALL STUDENT PASSWORDS
-========================= */
-export const resetAllStudentPasswords = async (req, res) => {
+/* RESET ALL FACULTY PASSWORDS */
+export const resetAllFacultyPasswords = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
 
-    const students = await Student.find({ universityId });
+    const faculties = await Faculty.find({ universityId });
     const resetData = [];
 
-    for (const student of students) {
+    for (const faculty of faculties) {
       const newPassword = generatePassword();
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       const updatedUser = await User.findOneAndUpdate(
-        { referenceId: student._id, role: "STUDENT" },
+        { referenceId: faculty._id, role: "FACULTY" },
         { password: hashedPassword },
         { new: true }
       );
 
       if (updatedUser) {
         resetData.push({
-          enrollmentNo: student.enrollmentNo,
-          name: student.name,
+          systemId: faculty.facultyId,
+          name: faculty.name,
           loginId: updatedUser.loginId,
           newPassword: newPassword,
-          department: student.department,
-          year: student.year
+          department: faculty.department
         });
       }
     }
 
     res.json({
-      message: "All passwords reset successfully",
+      message: "All faculty passwords reset successfully",
       count: resetData.length,
       data: resetData
     });
   } catch (error) {
-    console.error("Reset All Passwords Error:", error.message);
-    res.status(500).json({ message: "Failed to reset all passwords" });
+    console.error("Reset All Faculty Passwords Error:", error.message);
+    res.status(500).json({ message: "Failed to reset all faculty passwords" });
   }
 };
 
-/* =========================
-   EXPORT STUDENT CREDENTIALS
-========================= */
-export const exportStudentCredentials = async (req, res) => {
+/* EXPORT FACULTY CREDENTIALS */
+export const exportFacultyCredentials = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
 
-    const students = await Student.find({ universityId });
+    const faculties = await Faculty.find({ universityId });
     const credentials = [];
 
-    for (const student of students) {
+    for (const faculty of faculties) {
       const user = await User.findOne({
-        referenceId: student._id,
-        role: "STUDENT"
+        referenceId: faculty._id,
+        role: "FACULTY"
       });
 
       if (user) {
         credentials.push({
-          enrollmentNo: student.enrollmentNo,
-          name: student.name,
-          department: student.department,
-          year: student.year,
+          facultyId: faculty.facultyId,
+          name: faculty.name,
+          department: faculty.department,
           loginId: user.loginId,
           isActive: user.isActive
         });
       }
     }
 
-    // Generate and return as CSV
     if (credentials.length === 0) {
-      return res.status(404).json({ message: "No student credentials found" });
+      return res.status(404).json({ message: "No faculty credentials found" });
     }
 
-    const csvHeaders = ["enrollmentNo", "name", "department", "year", "loginId", "isActive"];
+    const csvHeaders = ["facultyId", "name", "department", "loginId", "isActive"];
     const credentialsCSV = generateCSV(credentials, csvHeaders);
 
     res.setHeader("Content-Type", "text/csv");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="student-credentials-${Date.now()}.csv"`
+      `attachment; filename="faculty-credentials-${Date.now()}.csv"`
     );
     res.send(credentialsCSV);
   } catch (error) {
-    console.error("Export Credentials Error:", error.message);
-    res.status(500).json({ message: "Failed to export credentials" });
+    console.error("Export Faculty Credentials Error:", error.message);
+    res.status(500).json({ message: "Failed to export faculty credentials" });
   }
 };
 
-export const bulkUploadStudents = async (req, res) => {
+/* BULK UPLOAD FACULTY */
+export const bulkUploadFaculty = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
 
@@ -432,7 +706,6 @@ export const bulkUploadStudents = async (req, res) => {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // Parse CSV file
     const csvData = await parseCSV(req.file.path);
 
     if (csvData.length === 0) {
@@ -440,8 +713,8 @@ export const bulkUploadStudents = async (req, res) => {
       return res.status(400).json({ message: "CSV file is empty" });
     }
 
-    // Validate CSV headers
-    const requiredHeaders = ["name", "department", "year"];
+    // Validate CSV headers (Name, Department)
+    const requiredHeaders = ["name", "department"];
     const csvHeaders = Object.keys(csvData[0]).map(h => h.toLowerCase().trim());
     
     const hasAllHeaders = requiredHeaders.every(header =>
@@ -455,100 +728,76 @@ export const bulkUploadStudents = async (req, res) => {
       });
     }
 
-    const createdStudents = [];
+    const createdFaculty = [];
     const errors = [];
 
-    // Process each row
     for (let i = 0; i < csvData.length; i++) {
       try {
         const row = csvData[i];
         
-        // Trim and normalize field names
         const name = row.name?.trim() || row.Name?.trim();
         const department = row.department?.trim() || row.Department?.trim();
-        const year = row.year?.trim() || row.Year?.trim();
 
-        // Validate required fields
-        if (!name || !department || !year) {
-          errors.push(`Row ${i + 1}: Missing required fields (name, department, year)`);
+        if (!name || !department) {
+          errors.push(`Row ${i + 1}: Missing required fields (name, department)`);
           continue;
         }
 
-        // Generate credentials
-        const enrollmentNo = generateEnrollmentNo(universityId);
+        const facultyId = generateFacultyId();
         const password = generatePassword();
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Create student
-        const student = await Student.create({
+        const faculty = await Faculty.create({
           universityId,
-          enrollmentNo,
+          facultyId,
           name,
-          department,
-          year
+          department
         });
 
-        // Create user account
         await User.create({
-          role: "STUDENT",
-          loginId: enrollmentNo,
+          role: "FACULTY",
+          loginId: facultyId,
           password: hashedPassword,
-          referenceId: student._id
+          referenceId: faculty._id
         });
 
-        createdStudents.push({
+        createdFaculty.push({
           name,
-          enrollmentNo,
+          facultyId,
           password,
-          department,
-          year
+          department
         });
       } catch (rowError) {
         errors.push(`Row ${i + 1}: ${rowError.message}`);
       }
     }
 
-    // Clean up uploaded file
     fs.unlinkSync(req.file.path);
 
-    // Generate CSV with credentials
-    if (createdStudents.length > 0) {
-      const csvHeaders = ["enrollmentNo", "name", "department", "year", "password"];
-      const credentialsCSV = generateCSV(createdStudents, csvHeaders);
+    if (createdFaculty.length > 0) {
+      const csvHeaders = ["facultyId", "name", "department", "password"];
+      const credentialsCSV = generateCSV(createdFaculty, csvHeaders);
       
-      // Send response with CSV file download
       res.setHeader("Content-Type", "text/csv");
       res.setHeader(
         "Content-Disposition",
-        `attachment; filename="student-credentials-${Date.now()}.csv"`
+        `attachment; filename="faculty-credentials-${Date.now()}.csv"`
       );
       
-      // Return JSON metadata + CSV attachment in response body
       return res.send(credentialsCSV);
     }
 
-    // Fallback response if no students created
     res.status(400).json({
-      message: "No students created. Check CSV file and try again.",
+      message: "No faculty created. Check CSV file and try again.",
       errors,
-      summary: {
-        total: csvData.length,
-        created: 0,
-        failed: errors.length
-      }
+      summary: { total: csvData.length, created: 0, failed: errors.length }
     });
   } catch (error) {
-    console.error("Bulk Upload Students Error:", error.message);
-    
-    // Clean up file if it exists
+    console.error("Bulk Upload Faculty Error:", error.message);
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
-
-    res.status(500).json({
-      message: "Failed to process CSV file",
-      error: error.message
-    });
+    res.status(500).json({ message: "Failed to process CSV file", error: error.message });
   }
 };
 

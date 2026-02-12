@@ -12,7 +12,6 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import { initSocket } from "./config/socket.js";
 
-// Routes
 import authRoutes from "./routes/auth.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import universityRoutes from "./routes/university.routes.js";
@@ -20,15 +19,13 @@ import studentRoutes from "./routes/student.routes.js";
 import facultyRoutes from "./routes/faculty.routes.js";
 import otpRoutes from "./routes/otp.routes.js";
 
-
-
 /* =========================
-   LOAD ENV (CRITICAL)
+   LOAD ENV
 ========================= */
-dotenv.config({ path: ".env" });
+dotenv.config();
 
 if (!process.env.MONGO_URI) {
-  console.error("❌ MONGO_URI is UNDEFINED. .env is not loading.");
+  console.error("❌ MONGO_URI missing in .env");
   process.exit(1);
 }
 
@@ -38,18 +35,18 @@ if (!process.env.MONGO_URI) {
 await connectDB();
 
 /* =========================
-   APP & SERVER
+   APP SETUP
 ========================= */
 const app = express();
 const server = http.createServer(app);
 
 /* =========================
-   SOCKET.IO
+   SOCKET
 ========================= */
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "*",
-    methods: ["GET", "POST", "PUT", "DELETE"]
+    origin: process.env.CLIENT_URL,
+    credentials: true
   }
 });
 
@@ -57,26 +54,22 @@ initSocket(io);
 app.set("io", io);
 
 /* =========================
-   SECURITY & MIDDLEWARES
+   SECURITY
 ========================= */
 app.use(helmet());
 
-// Allow multiple client URLs for CORS
 const allowedOrigins = [
   process.env.CLIENT_URL,
   "http://localhost:3000",
-  "http://localhost:3001",
-  "https://student-portal-pearl-tau.vercel.app",
-  // Add your deployed frontend URL here
+  "http://localhost:3001"
 ].filter(Boolean);
 
-app.use(cors({ 
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
+app.use(cors({
+  origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(new Error("CORS not allowed"));
     }
   },
   credentials: true
@@ -88,13 +81,10 @@ app.use(mongoSanitize());
 app.use(xss());
 app.use(morgan("dev"));
 
-app.use(
-  "/api",
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 1000
-  })
-);
+app.use("/api", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000
+}));
 
 /* =========================
    ROUTES
@@ -107,84 +97,59 @@ app.use("/api/faculty", facultyRoutes);
 app.use("/api/otp", otpRoutes);
 
 /* =========================
-   HEALTH & DEBUG
+   HEALTH
 ========================= */
 app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "General Student Portal Backend Running",
-    uptime: process.uptime()
-  });
-});
-
-// Debug endpoint to verify env and routes
-app.get("/debug", (req, res) => {
   res.json({
-    env_loaded: !!process.env.JWT_SECRET,
-    jwt_secret_length: process.env.JWT_SECRET?.length || 0,
-    mongo_connected: !!process.env.MONGO_URI,
-    email_user: process.env.EMAIL_USER || "NOT SET",
-    email_pass_length: process.env.EMAIL_PASS?.length || 0,
-    timestamp: new Date().toISOString()
+    success: true,
+    message: "Student Portal Backend Running",
+    environment: process.env.NODE_ENV
   });
 });
 
-// Test email endpoint
+/* =========================
+   DEBUG EMAIL
+========================= */
 app.post("/test-email", async (req, res) => {
   try {
     const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ message: "Email address required" });
-    }
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      return res.status(500).json({ 
-        message: "Email credentials not configured",
-        email_user: !!process.env.EMAIL_USER,
-        email_pass: !!process.env.EMAIL_PASS
-      });
+    if (!email) {
+      return res.status(400).json({ message: "Email required" });
     }
 
     const { sendOTPEmail } = await import("./services/mail.service.js");
-    
+
     await sendOTPEmail(email, "123456", "Test User");
 
-    res.json({
-      message: "✅ Test email sent successfully!",
-      email,
-      timestamp: new Date().toISOString(),
-      note: "Check your inbox and spam folder"
-    });
+    res.json({ success: true, message: "Test email sent" });
+
   } catch (error) {
-    console.error("Test Email Error:", error);
-    res.status(500).json({
-      message: "❌ Failed to send test email",
-      error: error.message,
-      details: "Check backend console for more details"
-    });
+    console.error(error);
+    res.status(500).json({ message: error.message });
   }
 });
 
 /* =========================
-   404 HANDLER
+   404
 ========================= */
 app.use((req, res) => {
-  res.status(404).json({ success: false, message: "Route not found" });
+  res.status(404).json({ message: "Route not found" });
 });
 
 /* =========================
-   ERROR HANDLER
+   ERROR
 ========================= */
 app.use((err, req, res, next) => {
-  console.error("❌ ERROR:", err);
-  res.status(500).json({ success: false, message: "Server error" });
+  console.error("❌ ERROR:", err.message);
+  res.status(500).json({ message: "Server error" });
 });
 
 /* =========================
-   START SERVER
+   START
 ========================= */
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

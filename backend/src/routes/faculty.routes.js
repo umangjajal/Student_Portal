@@ -1,7 +1,13 @@
 import express from "express";
 import auth from "../middlewares/auth.middleware.js";
 import { roleCheck } from "../middlewares/role.middleware.js";
-import { markAttendance } from "../controllers/faculty.controller.js";
+
+// Import operational controllers (Attendance, etc.)
+import { 
+  markAttendance 
+} from "../controllers/faculty.controller.js";
+
+// Import profile & security controllers
 import { 
   getFacultyProfile, 
   updateFacultyProfile, 
@@ -11,6 +17,9 @@ import {
 
 const router = express.Router();
 
+/* =========================================
+   OPERATIONAL ROUTES
+========================================= */
 router.post(
   "/attendance",
   auth,
@@ -18,7 +27,9 @@ router.post(
   markAttendance
 );
 
-// Profile Routes
+/* =========================================
+   PROFILE ROUTES
+========================================= */
 router.get(
   "/profile",
   auth,
@@ -33,7 +44,9 @@ router.put(
   updateFacultyProfile
 );
 
-// Password Reset Routes
+/* =========================================
+   PASSWORD RESET ROUTES
+========================================= */
 router.post(
   "/password/request-reset",
   auth,
