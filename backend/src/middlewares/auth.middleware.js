@@ -17,7 +17,7 @@ export default function auth(req, res, next) {
       process.env.JWT_SECRET
     );
 
-    req.user = decoded;
+    req.user = decoded; // Attaches { id, role, referenceId } to request
 
     next();
   } catch (error) {

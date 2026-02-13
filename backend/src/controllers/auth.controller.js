@@ -3,9 +3,64 @@ import University from "../models/University.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-/* =====================================
+/* =========================================
+   LOGIN (ALL ROLES)
+========================================= */
+export const login = async (req, res) => {
+  try {
+    const { identifier, loginId, password } = req.body;
+
+    const userIdentifier = identifier || loginId;
+
+    if (!userIdentifier || !password) {
+      return res.status(400).json({
+        message: "Login ID/Email and password required"
+      });
+    }
+
+    const user = await User.findOne({
+      $or: [
+        { email: userIdentifier },
+        { loginId: userIdentifier }
+      ]
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+        referenceId: user.referenceId
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      success: true,
+      token,
+      role: user.role
+    });
+
+  } catch (error) {
+    console.error("Login Error:", error);
+    res.status(500).json({ message: "Login failed" });
+  }
+};
+
+
+/* =========================================
    UNIVERSITY SIGNUP
-===================================== */
+========================================= */
 export const universitySignup = async (req, res) => {
   try {
     const {
@@ -19,32 +74,36 @@ export const universitySignup = async (req, res) => {
       postalCode
     } = req.body;
 
-    if (
-      !name ||
-      !email ||
-      !password ||
-      !place ||
-      !city ||
-      !state ||
-      !country ||
-      !postalCode
-    ) {
+    /* =========================
+       1️⃣ VALIDATION
+    ========================= */
+    if (!name || !email || !password || !place || !city || !state || !country || !postalCode) {
       return res.status(400).json({
-        message: "All university fields are required"
+        success: false,
+        message: "All fields are required"
       });
     }
 
-    const existingUser = await User.findOne({ email });
+    /* =========================
+       2️⃣ CHECK EXISTING USER
+    ========================= */
+    const existingUser = await User.findOne({
+      email: email.toLowerCase()
+    });
 
     if (existingUser) {
       return res.status(400).json({
-        message: "University already registered"
+        success: false,
+        message: "Email already registered"
       });
     }
 
+    /* =========================
+       3️⃣ CREATE UNIVERSITY PROFILE
+    ========================= */
     const university = await University.create({
       name,
-      email,
+      email: email.toLowerCase(),
       place,
       city,
       state,
@@ -53,113 +112,34 @@ export const universitySignup = async (req, res) => {
       approved: false
     });
 
+    /* =========================
+       4️⃣ HASH PASSWORD
+    ========================= */
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    /* =========================
+       5️⃣ CREATE AUTH USER
+    ========================= */
     await User.create({
       role: "UNIVERSITY",
-      email,
+      email: email.toLowerCase(),
+      loginId: email.toLowerCase(),
       password: hashedPassword,
       referenceId: university._id,
+      roleModel: "University",
       isActive: true
     });
 
     return res.status(201).json({
-      message:
-        "University registered successfully. Await admin approval."
-    });
-  } catch (error) {
-    console.error("University Signup Error:", error);
-    return res.status(500).json({
-      message: "University signup failed"
-    });
-  }
-};
-
-/* =====================================
-   LOGIN (ALL ROLES)
-===================================== */
-export const login = async (req, res) => {
-  try {
-    const { identifier, password } = req.body;
-
-    if (!identifier || !password) {
-      return res.status(400).json({
-        message: "Identifier and password required"
-      });
-    }
-
-    const user = await User.findOne({
-      $or: [
-        { email: identifier },
-        { loginId: identifier }
-      ]
-    });
-
-    if (!user) {
-      return res.status(401).json({
-        message: "Invalid credentials"
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({
-        message: "Account is inactive"
-      });
-    }
-
-    const isMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
-
-    if (!isMatch) {
-      return res.status(401).json({
-        message: "Invalid credentials"
-      });
-    }
-
-    // University approval check
-    if (user.role === "UNIVERSITY") {
-      const university = await University.findById(
-        user.referenceId
-      );
-
-      if (!university || !university.approved) {
-        return res.status(403).json({
-          message: "University not approved yet"
-        });
-      }
-    }
-
-    const payload = {
-      id: user._id,
-      role: user.role,
-      referenceId: user.referenceId || null
-    };
-
-    const token = jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
-
-    const refreshToken = jwt.sign(
-      { id: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    return res.status(200).json({
-      message: "Login successful",
-      token,
-      refreshToken,
-      role: user.role
+      success: true,
+      message: "University registered successfully. Await admin approval."
     });
 
   } catch (error) {
-    console.error("LOGIN ERROR:", error);
+    console.error("Signup Error:", error);
     return res.status(500).json({
-      message: "Login failed"
+      success: false,
+      message: "Registration failed"
     });
   }
 };

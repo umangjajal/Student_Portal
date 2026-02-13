@@ -12,6 +12,7 @@ import { Server } from "socket.io";
 import connectDB from "./config/db.js";
 import { initSocket } from "./config/socket.js";
 
+// Import Routes
 import authRoutes from "./routes/auth.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import universityRoutes from "./routes/university.routes.js";
@@ -41,11 +42,11 @@ const app = express();
 const server = http.createServer(app);
 
 /* =========================
-   SOCKET
+   SOCKET.IO SETUP
 ========================= */
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL,
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
     credentials: true
   }
 });
@@ -54,7 +55,7 @@ initSocket(io);
 app.set("io", io);
 
 /* =========================
-   SECURITY
+   SECURITY & MIDDLEWARE
 ========================= */
 app.use(helmet());
 
@@ -75,15 +76,21 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json({ limit: "10mb" }));
+// Body Parsers (CRITICAL for Login)
+app.use(express.json({ limit: "10mb" })); 
 app.use(express.urlencoded({ extended: true }));
+
+// Data Sanitization
 app.use(mongoSanitize());
 app.use(xss());
+
+// Logging
 app.use(morgan("dev"));
 
+// Rate Limiting
 app.use("/api", rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1000
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000 // limit each IP to 1000 requests per windowMs
 }));
 
 /* =========================
@@ -97,7 +104,7 @@ app.use("/api/faculty", facultyRoutes);
 app.use("/api/otp", otpRoutes);
 
 /* =========================
-   HEALTH
+   HEALTH CHECK
 ========================= */
 app.get("/", (req, res) => {
   res.json({
@@ -108,22 +115,17 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
-   DEBUG EMAIL
+   DEBUG EMAIL (Optional)
 ========================= */
 app.post("/test-email", async (req, res) => {
   try {
     const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ message: "Email required" });
-    }
+    if (!email) return res.status(400).json({ message: "Email required" });
 
     const { sendOTPEmail } = await import("./services/mail.service.js");
-
     await sendOTPEmail(email, "123456", "Test User");
 
     res.json({ success: true, message: "Test email sent" });
-
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -131,22 +133,21 @@ app.post("/test-email", async (req, res) => {
 });
 
 /* =========================
-   404
+   ERROR HANDLING
 ========================= */
+// 404 Route
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  res.status(404).json({ message: `Route not found: ${req.originalUrl}` });
 });
 
-/* =========================
-   ERROR
-========================= */
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error("❌ ERROR:", err.message);
-  res.status(500).json({ message: "Server error" });
+  res.status(500).json({ message: "Internal Server Error", error: err.message });
 });
 
 /* =========================
-   START
+   START SERVER
 ========================= */
 const PORT = process.env.PORT || 5000;
 

@@ -1,57 +1,116 @@
-"use client";
+'use client';
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { jwtDecode } from "jwt-decode";
+import { createContext, useState, useEffect, useContext } from 'react';
+import { jwtDecode } from 'jwt-decode';
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const loadUser = () => {
-    const token = localStorage.getItem("token");
+  /* =========================================
+     LOAD USER FROM TOKEN ON APP START
+  ========================================= */
+  useEffect(() => {
+    const initializeAuth = () => {
+      if (typeof window === 'undefined') return;
 
-    if (!token) {
-      setUser(null);
+      const token = localStorage.getItem('token');
+
+      if (!token) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const decoded = jwtDecode(token);
+
+        const currentTime = Date.now() / 1000;
+
+        // ❌ Token expired
+        if (decoded.exp < currentTime) {
+          console.warn("Token expired");
+          localStorage.removeItem('token');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // ✅ Valid token
+        setUser({
+          id: decoded.id,
+          role: decoded.role,
+          referenceId: decoded.referenceId
+        });
+
+      } catch (error) {
+        console.error("Invalid token:", error);
+        localStorage.removeItem('token');
+        setUser(null);
+      }
+
       setLoading(false);
-      return;
-    }
+    };
+
+    initializeAuth();
+  }, []);
+
+  /* =========================================
+     LOGIN FUNCTION
+  ========================================= */
+  const login = (token) => {
+    if (!token) return;
+
+    localStorage.setItem('token', token);
 
     try {
       const decoded = jwtDecode(token);
+
       setUser({
         id: decoded.id,
         role: decoded.role,
-        referenceId: decoded.referenceId,
+        referenceId: decoded.referenceId
       });
-    } catch (err) {
-      localStorage.removeItem("token");
-      setUser(null);
-    } finally {
-      setLoading(false);
+
+    } catch (error) {
+      console.error("Login token decode error:", error);
+      localStorage.removeItem('token');
     }
   };
 
-  useEffect(() => {
-    loadUser();
-
-    // Listen for storage changes from other tabs/windows
-    const handleStorageChange = (e) => {
-      if (e.key === "token") {
-        loadUser();
-      }
-    };
-
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  /* =========================================
+     LOGOUT FUNCTION
+  ========================================= */
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        loading
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+/* =========================================
+   CUSTOM HOOK
+========================================= */
+export function useAuth() {
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used inside AuthProvider");
+  }
+
+  return context;
+}

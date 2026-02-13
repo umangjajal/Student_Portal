@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
-export function middleware(req) {
-  // ✅ Allow all requests to proceed
-  // Client-side auth guards (withRoleLayout, AdminLayout) will handle authorization
+export function middleware(request) {
+  // Let client-side AuthContext + Layout handle protection
   return NextResponse.next();
 }
 
