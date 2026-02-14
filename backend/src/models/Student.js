@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const studentSchema = new mongoose.Schema(
   {
+    // The reference linking the student to their specific university
     universityId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "University",
@@ -15,7 +16,7 @@ const studentSchema = new mongoose.Schema(
     },
 
     name: { type: String, required: true },
-    email: { type: String, unique: true, sparse: true },
+    email: { type: String, unique: true, sparse: true }, // Sparse allows multiple students to have null/no email
     phone: { type: String },
     department: String,
     year: String,
@@ -30,5 +31,12 @@ const studentSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// CRITICAL FOR MULTI-TENANCY: 
+// This index makes filtering students by university extremely fast.
+studentSchema.index({ universityId: 1 });
+
+// This compound index ensures a student's enrollment number is unique within their specific university
+studentSchema.index({ universityId: 1, enrollmentNo: 1 }, { unique: true });
 
 export default mongoose.model("Student", studentSchema);

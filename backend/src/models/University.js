@@ -19,6 +19,7 @@ const universitySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Index for faster login lookups
 universitySchema.index({ email: 1 });
 
 export default mongoose.model("University", universitySchema);

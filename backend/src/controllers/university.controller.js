@@ -10,8 +10,7 @@ import fs from "fs";
 /* =========================
    UTILS
 ========================= */
-const generatePassword = () =>
-  crypto.randomBytes(4).toString("hex");
+const generatePassword = () => crypto.randomBytes(4).toString("hex");
 
 const generateEnrollmentNo = (universityId) => {
   const year = new Date().getFullYear();
@@ -24,7 +23,7 @@ const generateFacultyId = () => {
 };
 
 /* =========================
-   CREATE STUDENT
+   STUDENT MANAGEMENT
 ========================= */
 export const createStudent = async (req, res) => {
   try {
@@ -39,7 +38,7 @@ export const createStudent = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const student = await Student.create({
-      universityId,
+      universityId, // MUST exist in Student Schema
       enrollmentNo,
       name: req.body.name,
       department: req.body.department,
@@ -66,12 +65,10 @@ export const createStudent = async (req, res) => {
   }
 };
 
-/* =========================
-   GET STUDENTS
-========================= */
 export const getStudents = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
+    // Strict scoping
     const students = await Student.find({ universityId });
     res.json(students);
   } catch (error) {
@@ -80,22 +77,19 @@ export const getStudents = async (req, res) => {
   }
 };
 
-/* =========================
-   UPDATE STUDENT
-========================= */
 export const updateStudent = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
     const { id } = req.params;
 
     const student = await Student.findOneAndUpdate(
-      { _id: id, universityId },
+      { _id: id, universityId }, // Security Check
       req.body,
       { new: true }
     );
 
     if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      return res.status(404).json({ message: "Student not found or access denied" });
     }
 
     res.json({ message: "Student updated successfully", student });
@@ -105,9 +99,6 @@ export const updateStudent = async (req, res) => {
   }
 };
 
-/* =========================
-   DELETE STUDENT
-========================= */
 export const deleteStudent = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -115,14 +106,13 @@ export const deleteStudent = async (req, res) => {
 
     const student = await Student.findOneAndDelete({
       _id: id,
-      universityId
+      universityId // Security Check
     });
 
     if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      return res.status(404).json({ message: "Student not found or access denied" });
     }
 
-    // Delete associated user account
     await User.deleteOne({ referenceId: id, role: "STUDENT" });
 
     res.json({ message: "Student deleted successfully" });
@@ -132,11 +122,6 @@ export const deleteStudent = async (req, res) => {
   }
 };
 
-/* =========================
-   STUDENT CREDENTIALS & BULK
-========================= */
-
-/* GET STUDENTS WITH CREDENTIALS */
 export const getStudentsWithCredentials = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -175,7 +160,6 @@ export const getStudentsWithCredentials = async (req, res) => {
   }
 };
 
-/* RESET SINGLE STUDENT PASSWORD */
 export const resetStudentPassword = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -183,7 +167,7 @@ export const resetStudentPassword = async (req, res) => {
 
     const student = await Student.findOne({
       _id: studentId,
-      universityId
+      universityId // Security Check
     });
 
     if (!student) {
@@ -219,7 +203,6 @@ export const resetStudentPassword = async (req, res) => {
   }
 };
 
-/* RESET ALL STUDENT PASSWORDS */
 export const resetAllStudentPasswords = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -260,7 +243,6 @@ export const resetAllStudentPasswords = async (req, res) => {
   }
 };
 
-/* EXPORT STUDENT CREDENTIALS */
 export const exportStudentCredentials = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -305,7 +287,6 @@ export const exportStudentCredentials = async (req, res) => {
   }
 };
 
-/* BULK UPLOAD STUDENTS */
 export const bulkUploadStudents = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -360,7 +341,7 @@ export const bulkUploadStudents = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const student = await Student.create({
-          universityId,
+          universityId, // Security enforcement
           enrollmentNo,
           name,
           department,
@@ -416,7 +397,7 @@ export const bulkUploadStudents = async (req, res) => {
 };
 
 /* =========================
-   CREATE FACULTY
+   FACULTY MANAGEMENT
 ========================= */
 export const createFaculty = async (req, res) => {
   try {
@@ -431,7 +412,7 @@ export const createFaculty = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const faculty = await Faculty.create({
-      universityId,
+      universityId, // Security enforcement
       facultyId,
       name: req.body.name,
       department: req.body.department
@@ -457,13 +438,10 @@ export const createFaculty = async (req, res) => {
   }
 };
 
-/* =========================
-   GET FACULTY
-========================= */
 export const getFaculty = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
-    const faculty = await Faculty.find({ universityId });
+    const faculty = await Faculty.find({ universityId }); // Security check
     res.json(faculty);
   } catch (error) {
     console.error("Get Faculty Error:", error.message);
@@ -471,22 +449,19 @@ export const getFaculty = async (req, res) => {
   }
 };
 
-/* =========================
-   UPDATE FACULTY
-========================= */
 export const updateFaculty = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
     const { id } = req.params;
 
     const faculty = await Faculty.findOneAndUpdate(
-      { _id: id, universityId },
+      { _id: id, universityId }, // Security check
       req.body,
       { new: true }
     );
 
     if (!faculty) {
-      return res.status(404).json({ message: "Faculty not found" });
+      return res.status(404).json({ message: "Faculty not found or access denied" });
     }
 
     res.json({ message: "Faculty updated successfully", faculty });
@@ -496,9 +471,6 @@ export const updateFaculty = async (req, res) => {
   }
 };
 
-/* =========================
-   DELETE FACULTY
-========================= */
 export const deleteFaculty = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -506,14 +478,13 @@ export const deleteFaculty = async (req, res) => {
 
     const faculty = await Faculty.findOneAndDelete({
       _id: id,
-      universityId
+      universityId // Security check
     });
 
     if (!faculty) {
-      return res.status(404).json({ message: "Faculty not found" });
+      return res.status(404).json({ message: "Faculty not found or access denied" });
     }
 
-    // Delete associated user account
     await User.deleteOne({ referenceId: id, role: "FACULTY" });
 
     res.json({ message: "Faculty deleted successfully" });
@@ -523,11 +494,6 @@ export const deleteFaculty = async (req, res) => {
   }
 };
 
-/* =========================
-   FACULTY CREDENTIALS & BULK
-========================= */
-
-/* GET FACULTY WITH CREDENTIALS */
 export const getFacultyWithCredentials = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -565,7 +531,6 @@ export const getFacultyWithCredentials = async (req, res) => {
   }
 };
 
-/* RESET SINGLE FACULTY PASSWORD */
 export const resetFacultyPassword = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -573,7 +538,7 @@ export const resetFacultyPassword = async (req, res) => {
 
     const faculty = await Faculty.findOne({
       _id: facultyId,
-      universityId
+      universityId // Security check
     });
 
     if (!faculty) {
@@ -609,7 +574,6 @@ export const resetFacultyPassword = async (req, res) => {
   }
 };
 
-/* RESET ALL FACULTY PASSWORDS */
 export const resetAllFacultyPasswords = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -649,7 +613,6 @@ export const resetAllFacultyPasswords = async (req, res) => {
   }
 };
 
-/* EXPORT FACULTY CREDENTIALS */
 export const exportFacultyCredentials = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -693,7 +656,6 @@ export const exportFacultyCredentials = async (req, res) => {
   }
 };
 
-/* BULK UPLOAD FACULTY */
 export const bulkUploadFaculty = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -713,7 +675,6 @@ export const bulkUploadFaculty = async (req, res) => {
       return res.status(400).json({ message: "CSV file is empty" });
     }
 
-    // Validate CSV headers (Name, Department)
     const requiredHeaders = ["name", "department"];
     const csvHeaders = Object.keys(csvData[0]).map(h => h.toLowerCase().trim());
     
@@ -748,7 +709,7 @@ export const bulkUploadFaculty = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const faculty = await Faculty.create({
-          universityId,
+          universityId, // Security enforcement
           facultyId,
           name,
           department
@@ -804,8 +765,6 @@ export const bulkUploadFaculty = async (req, res) => {
 /* =========================
    NOTIFICATIONS (UPDATES)
 ========================= */
-
-/* CREATE NEW UPDATE/NOTIFICATION */
 export const createNotification = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -816,7 +775,7 @@ export const createNotification = async (req, res) => {
     }
 
     const notification = await Notification.create({
-      universityId,
+      universityId, // Security check
       title,
       message,
       roleTarget: roleTarget || "ALL",
@@ -834,12 +793,11 @@ export const createNotification = async (req, res) => {
   }
 };
 
-/* GET ALL UPDATES FOR UNIVERSITY */
 export const getUniversityNotifications = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
 
-    const notifications = await Notification.find({ universityId })
+    const notifications = await Notification.find({ universityId }) // Security check
       .sort({ createdAt: -1 })
       .limit(100);
 
@@ -854,7 +812,6 @@ export const getUniversityNotifications = async (req, res) => {
   }
 };
 
-/* GET SINGLE UPDATE DETAIL */
 export const getNotificationDetail = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -862,7 +819,7 @@ export const getNotificationDetail = async (req, res) => {
 
     const notification = await Notification.findOne({
       _id: notificationId,
-      universityId
+      universityId // Security check
     });
 
     if (!notification) {
@@ -879,7 +836,6 @@ export const getNotificationDetail = async (req, res) => {
   }
 };
 
-/* UPDATE NOTIFICATION */
 export const updateNotification = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -887,13 +843,13 @@ export const updateNotification = async (req, res) => {
     const { title, message, roleTarget, priority, isActive } = req.body;
 
     const notification = await Notification.findOneAndUpdate(
-      { _id: notificationId, universityId },
+      { _id: notificationId, universityId }, // Security check
       { title, message, roleTarget, priority, isActive },
       { new: true }
     );
 
     if (!notification) {
-      return res.status(404).json({ message: "Update not found" });
+      return res.status(404).json({ message: "Update not found or access denied" });
     }
 
     res.json({
@@ -906,7 +862,6 @@ export const updateNotification = async (req, res) => {
   }
 };
 
-/* DELETE NOTIFICATION */
 export const deleteNotification = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
@@ -914,11 +869,11 @@ export const deleteNotification = async (req, res) => {
 
     const notification = await Notification.findOneAndDelete({
       _id: notificationId,
-      universityId
+      universityId // Security check
     });
 
     if (!notification) {
-      return res.status(404).json({ message: "Update not found" });
+      return res.status(404).json({ message: "Update not found or access denied" });
     }
 
     res.json({
@@ -933,36 +888,37 @@ export const deleteNotification = async (req, res) => {
 /* =========================
    DASHBOARD STATS (AGGREGATED)
 ========================= */
+
 export const getDashboardStats = async (req, res) => {
   try {
     const universityId = req.user.referenceId;
 
     if (!universityId) {
-      return res.status(400).json({ message: "Invalid university user" });
+      return res.status(400).json({ message: "Invalid university session" });
     }
 
-    // Fetch all data in parallel
-    const [studentsCount, facultyCount, activeNotifications, allNotifications] = await Promise.all([
-      Student.countDocuments({ universityId }),
-      Faculty.countDocuments({ universityId }),
-      Notification.countDocuments({ universityId, isActive: true }),
-      Notification.find({ universityId })
-        .sort({ createdAt: -1 })
-        .limit(5)
+    // Parallel execution for maximum speed
+    const [studentsCount, facultyCount, activeNotifications, recentNotifications] = await Promise.all([
+      Student.countDocuments({ universityId }), 
+      Faculty.countDocuments({ universityId }), 
+      Notification.countDocuments({ universityId, isActive: true }), 
+      Notification.find({ universityId }).sort({ createdAt: -1 }).limit(5)
+      // Course.countDocuments({ universityId }) // Add this once Course model exists
     ]);
 
     res.json({
-      message: "Dashboard stats retrieved successfully",
+      success: true,
+      message: "Dashboard data synced successfully",
       data: {
         totalStudents: studentsCount,
         totalFaculty: facultyCount,
         activeNotifications: activeNotifications,
-        totalCourses: 0,
-        recentNotifications: allNotifications
+        totalCourses: 0, // Update this to actual count later
+        recentNotifications
       }
     });
   } catch (error) {
-    console.error("Dashboard Stats Error:", error.message);
-    res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    console.error("Dashboard Aggregation Error:", error.message);
+    res.status(500).json({ message: "Failed to compile dashboard statistics" });
   }
 };

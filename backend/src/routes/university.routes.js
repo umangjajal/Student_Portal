@@ -60,7 +60,7 @@ const upload = multer({
    DASHBOARD
 ========================= */
 router.get(
-  "/dashboard/stats",
+  "/dashboard-stats",   // ✅ changed from /dashboard/stats
   auth,
   roleCheck("UNIVERSITY"),
   getDashboardStats
@@ -111,7 +111,6 @@ router.delete("/students/:id", auth, roleCheck("UNIVERSITY"), deleteStudent);
    FACULTY ROUTES
 ========================= */
 
-// Static FIRST
 router.post(
   "/faculty/bulk/upload",
   auth,
@@ -141,7 +140,6 @@ router.post(
   resetAllFacultyPasswords
 );
 
-// Dynamic AFTER
 router.post("/faculty", auth, roleCheck("UNIVERSITY"), createFaculty);
 router.get("/faculty", auth, roleCheck("UNIVERSITY"), getFaculty);
 router.post("/faculty/reset-password/:facultyId", auth, roleCheck("UNIVERSITY"), resetFacultyPassword);
@@ -151,15 +149,17 @@ router.delete("/faculty/:id", auth, roleCheck("UNIVERSITY"), deleteFaculty);
 /* =========================
    NOTIFICATIONS
 ========================= */
-router.post("/updates", auth, roleCheck("UNIVERSITY"), createNotification);
-router.get("/updates", auth, roleCheck("UNIVERSITY"), getUniversityNotifications);
-router.get("/updates/:notificationId", auth, roleCheck("UNIVERSITY"), getNotificationDetail);
-router.put("/updates/:notificationId", auth, roleCheck("UNIVERSITY"), updateNotification);
-router.delete("/updates/:notificationId", auth, roleCheck("UNIVERSITY"), deleteNotification);
+
+router.post("/notifications", auth, roleCheck("UNIVERSITY"), createNotification);
+router.get("/notifications", auth, roleCheck("UNIVERSITY"), getUniversityNotifications);
+router.get("/notifications/:notificationId", auth, roleCheck("UNIVERSITY"), getNotificationDetail);
+router.put("/notifications/:notificationId", auth, roleCheck("UNIVERSITY"), updateNotification);
+router.delete("/notifications/:notificationId", auth, roleCheck("UNIVERSITY"), deleteNotification);
 
 /* =========================
    PROFILE
 ========================= */
+
 router.get("/profile", auth, roleCheck("UNIVERSITY"), getUniversityProfile);
 router.put("/profile", auth, roleCheck("UNIVERSITY"), updateUniversityProfile);
 router.post("/password/request-reset", auth, roleCheck("UNIVERSITY"), requestPasswordReset);

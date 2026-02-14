@@ -9,8 +9,9 @@ import { sendOTPEmail } from "../services/mail.service.js";
 ========================= */
 export const getUniversityProfile = async (req, res) => {
   try {
-    const university = await University.findById(req.user.referenceId).select("-__v");
-    const user = await User.findOne({ referenceId: req.user.referenceId, role: "UNIVERSITY" }).select("-password -resetOTP -resetToken -__v");
+    const universityId = req.user.referenceId;
+    const university = await University.findById(universityId).select("-__v");
+    const user = await User.findOne({ referenceId: universityId, role: "UNIVERSITY" }).select("-password -resetOTP -resetToken -__v");
 
     if (!university) {
       return res.status(404).json({ message: "University profile not found" });
@@ -34,10 +35,11 @@ export const getUniversityProfile = async (req, res) => {
 ========================= */
 export const updateUniversityProfile = async (req, res) => {
   try {
+    const universityId = req.user.referenceId;
     const { name, phone, place, city, state, country, postalCode, avatar, logo, website, contactPerson } = req.body;
 
     const university = await University.findByIdAndUpdate(
-      req.user.referenceId,
+      universityId,
       {
         name,
         phone,
@@ -73,30 +75,27 @@ export const updateUniversityProfile = async (req, res) => {
 ========================= */
 export const requestPasswordReset = async (req, res) => {
   try {
-    // Verify email credentials are configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       console.error("Email credentials not configured");
       return res.status(500).json({ message: "Email service not configured. Please contact administrator." });
     }
 
-    const user = await User.findOne({ referenceId: req.user.referenceId });
+    const universityId = req.user.referenceId;
+    const user = await User.findOne({ referenceId: universityId });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Generate OTP
     const otp = crypto.randomInt(100000, 999999).toString();
-    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); 
 
-    // Save OTP to database
     await User.findByIdAndUpdate(user._id, {
       resetOTP: otp,
       resetOTPExpiry: otpExpiry
     });
 
-    // Send OTP via email
-    const university = await University.findById(req.user.referenceId);
+    const university = await University.findById(universityId);
     const emailRecipient = user.email || university.email;
 
     if (!emailRecipient) {
@@ -107,7 +106,6 @@ export const requestPasswordReset = async (req, res) => {
       await sendOTPEmail(emailRecipient, otp, university.name || "User");
     } catch (emailError) {
       console.error("Email sending failed:", emailError.message);
-      // Still consider this a success if OTP was saved (user can get OTP from other means)
       return res.json({
         message: "OTP saved (email delivery may be delayed)",
         email: emailRecipient,
@@ -130,19 +128,19 @@ export const requestPasswordReset = async (req, res) => {
 ========================= */
 export const verifyOTPAndResetPassword = async (req, res) => {
   try {
+    const universityId = req.user.referenceId;
     const { otp, newPassword } = req.body;
 
     if (!otp || !newPassword) {
       return res.status(400).json({ message: "OTP and new password are required" });
     }
 
-    const user = await User.findOne({ referenceId: req.user.referenceId });
+    const user = await User.findOne({ referenceId: universityId });
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Verify OTP
     if (user.resetOTP !== otp) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
@@ -151,10 +149,8 @@ export const verifyOTPAndResetPassword = async (req, res) => {
       return res.status(400).json({ message: "OTP expired" });
     }
 
-    // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password and clear OTP
     await User.findByIdAndUpdate(user._id, {
       password: hashedPassword,
       resetOTP: null,

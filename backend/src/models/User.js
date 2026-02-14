@@ -15,16 +15,15 @@ const userSchema = new mongoose.Schema(
 
     roleModel: {
       type: String,
-      enum: ["University", "Student", "Faculty"]
+      enum: ["University", "Student", "Faculty"] // Ensure 'University' is capitalized to match the Model name
     },
 
     email: { type: String, unique: true, sparse: true },
-    loginId: { type: String, unique: true, sparse: true }, // studentId / facultyId
+    loginId: { type: String, unique: true, sparse: true }, 
     password: { type: String, required: true },
 
     isActive: { type: Boolean, default: true },
     
-    // OTP and password reset
     resetOTP: String,
     resetOTPExpiry: Date,
     resetToken: String,

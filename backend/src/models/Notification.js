@@ -6,14 +6,8 @@ const notificationSchema = new mongoose.Schema({
     ref: "University",
     required: true
   },
-  title: {
-    type: String,
-    required: true
-  },
-  message: {
-    type: String,
-    required: true
-  },
+  title: { type: String, required: true },
+  message: { type: String, required: true },
   roleTarget: {
     type: String,
     enum: ["STUDENT", "FACULTY", "ADMIN", "ALL"],
@@ -24,10 +18,9 @@ const notificationSchema = new mongoose.Schema({
     enum: ["LOW", "MEDIUM", "HIGH"],
     default: "MEDIUM"
   },
-  isActive: {
-    type: Boolean,
-    default: true
-  }
+  isActive: { type: Boolean, default: true }
 }, { timestamps: true });
+
+notificationSchema.index({ universityId: 1, createdAt: -1 });
 
 export default mongoose.model("Notification", notificationSchema);
