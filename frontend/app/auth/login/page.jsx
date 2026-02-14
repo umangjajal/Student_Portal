@@ -10,6 +10,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { user, login, loading: authLoading } = useAuth();
 
+  // Strictly only using loginId and password
   const [formData, setFormData] = useState({
     loginId: "",
     password: "",
@@ -18,9 +19,7 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  /* =========================================
-     AUTO REDIRECT IF ALREADY LOGGED IN
-  ========================================= */
+  // Auto-redirect if user is already logged in
   useEffect(() => {
     if (authLoading) return;
 
@@ -47,7 +46,7 @@ export default function LoginPage() {
         router.replace("/student/dashboard");
         break;
       default:
-        router.replace("/auth/login");
+        setError("Unknown role. Please contact support.");
     }
   };
 
@@ -60,8 +59,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // API Call strictly sending loginId and password
       const res = await api.post("/auth/login", {
-        identifier: formData.loginId.trim(),
+        loginId: formData.loginId.trim(),
         password: formData.password,
       });
 
@@ -71,22 +71,16 @@ export default function LoginPage() {
         throw new Error("Token not received from server");
       }
 
-      // ✅ Save token via AuthContext
+      // Save token & cookie via AuthContext
       login(token);
-
-      // Small delay to ensure context updates
-      setTimeout(() => {
-        const decodedRole = JSON.parse(atob(token.split(".")[1])).role;
-        redirectByRole(decodedRole);
-      }, 100);
+      
+      // Decode the token locally just to figure out where to redirect instantly
+      const decodedRole = JSON.parse(atob(token.split(".")[1])).role;
+      redirectByRole(decodedRole);
 
     } catch (err) {
       console.error("Login Error:", err);
-
-      setError(
-        err.response?.data?.message ||
-        "Invalid credentials or server error"
-      );
+      setError(err.response?.data?.message || "Invalid credentials or server error");
     } finally {
       setLoading(false);
     }
@@ -109,10 +103,10 @@ export default function LoginPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Identifier */}
+          {/* Login ID Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email or ID
+              Email or Login ID
             </label>
             <input
               type="text"
@@ -126,7 +120,7 @@ export default function LoginPage() {
             />
           </div>
 
-          {/* Password */}
+          {/* Password Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Password

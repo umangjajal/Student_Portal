@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation';
 import { Users, BookOpen, ClipboardCheck, Bell, RefreshCw, Plus, TrendingUp, Clock, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import api from '@/services/api';
+import { useAuth } from '@/context/AuthContext'; // ✅ Secure logout context
 
 export default function UniversityDashboard() {
   const router = useRouter();
+  const { logout } = useAuth(); 
+
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalFaculty: 0,
@@ -21,6 +24,7 @@ export default function UniversityDashboard() {
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  
   const [notificationForm, setNotificationForm] = useState({
     title: '',
     message: '',
@@ -29,8 +33,8 @@ export default function UniversityDashboard() {
   });
 
   useEffect(() => {
-    // Check authentication
-    const token = localStorage.getItem('token');
+    // ✅ Check authentication using sessionStorage
+    const token = sessionStorage.getItem('token');
     if (!token) {
       router.push('/auth/login');
       return;
@@ -44,25 +48,22 @@ export default function UniversityDashboard() {
       setError(null);
 
       // Verify token exists
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token'); 
       if (!token) {
         setError('No authentication token found. Please login again.');
         router.push('/auth/login');
         return;
       }
 
-      // Debug: Log token info
-      console.log('Token exists, length:', token.length);
-
-      // Fetch aggregated dashboard stats
-      const dashboardRes = await api.get('/university/dashboard/stats').catch(err => {
+      // ✅ Fetch aggregated dashboard stats 
+      const dashboardRes = await api.get('/university/dashboard-stats').catch(err => {
         const status = err.response?.status;
         const data = err.response?.data;
         console.error('Dashboard API Error - Status:', status, 'Data:', data);
         
         if (status === 401) {
           // Token invalid or expired
-          localStorage.removeItem('token');
+          logout(); 
           router.push('/auth/login');
           throw new Error('Authentication token invalid. Please login again.');
         }
@@ -78,7 +79,8 @@ export default function UniversityDashboard() {
         totalCourses: dashboardData.totalCourses || 0
       });
 
-      setRecentNotifications(dashboardData.recentNotifications || []);
+      // Safely set arrays to prevent .map() crashes
+      setRecentNotifications(Array.isArray(dashboardData.recentNotifications) ? dashboardData.recentNotifications : []);
 
       // Fetch recent students for the table
       try {
@@ -86,8 +88,10 @@ export default function UniversityDashboard() {
           console.warn('Students fetch warning:', err.response?.status);
           return { data: [] };
         });
+        
+        // Backend returns the array directly in res.data
         const studentsList = Array.isArray(studentsRes.data) ? studentsRes.data : [];
-        setRecentStudents(studentsList.slice(0, 5) || []);
+        setRecentStudents(studentsList.slice(0, 5));
       } catch (err) {
         console.warn('Optional students data failed:', err);
         setRecentStudents([]);
@@ -109,7 +113,8 @@ export default function UniversityDashboard() {
   const handleCreateNotification = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/university/updates', notificationForm);
+      // ✅ Correct backend endpoint
+      await api.post('/university/notifications', notificationForm);
       setShowCreateModal(false);
       setNotificationForm({ title: '', message: '', priority: 'MEDIUM', roleTarget: 'ALL' });
       await fetchDashboardData();

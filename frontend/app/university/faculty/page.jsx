@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import api from '@/services/api'; // Ensure this points to your axios instance
+import api from '@/services/api'; 
 import { 
   Trash2, 
   Edit2, 
@@ -8,17 +8,20 @@ import {
   Check, 
   Download, 
   Upload, 
-  KeyRound, // For password reset
-  X 
+  KeyRound, 
+  X,
+  Search,
+  BookOpen
 } from 'lucide-react';
 
 export default function FacultyPage() {
   const [faculty, setFaculty] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [showBulkUpload, setShowBulkUpload] = useState(false);
   const [csvFile, setCsvFile] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   
   // State for copying to clipboard
   const [copiedCred, setCopiedCred] = useState(null);
@@ -36,14 +39,19 @@ export default function FacultyPage() {
   const [credentials, setCredentials] = useState(null);
 
   /* =========================
-       FETCH FACULTY
+        FETCH FACULTY
   ========================= */
   const fetchFaculty = async () => {
     try {
+      setLoading(true);
       const res = await api.get('/university/faculty');
-      setFaculty(res.data);
+      // ✅ Safe array handling
+      const data = res.data?.data || res.data;
+      setFaculty(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,7 +60,7 @@ export default function FacultyPage() {
   }, []);
 
   /* =========================
-       CSV TEMPLATE DOWNLOAD
+        CSV TEMPLATE DOWNLOAD
   ========================= */
   const downloadTemplate = () => {
     const headers = ['name', 'department']; // backend expects strictly these
@@ -72,7 +80,7 @@ export default function FacultyPage() {
   };
 
   /* =========================
-       BULK UPLOAD
+        BULK UPLOAD
   ========================= */
   const handleBulkUpload = async (e) => {
     e.preventDefault();
@@ -83,10 +91,10 @@ export default function FacultyPage() {
     formData.append('file', csvFile);
 
     try {
-      // Matches the backend bulkUploadFaculty function
-      const res = await api.post('/university/faculty/bulk/upload', formData, {
+      // ✅ Fixed Route: Matches backend exactly (/university/faculty/bulk-upload)
+      const res = await api.post('/university/faculty/bulk-upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-        responseType: 'blob' // Important: Backend returns a CSV file
+        responseType: 'blob' 
       });
 
       // Trigger download of the result CSV (with passwords)
@@ -103,7 +111,7 @@ export default function FacultyPage() {
       fetchFaculty();
       setShowBulkUpload(false);
     } catch (err) {
-      alert('Bulk upload failed. Check console.');
+      alert('Bulk upload failed. Please ensure the CSV format is correct.');
       console.error(err);
     } finally {
       setBulkLoading(false);
@@ -111,7 +119,7 @@ export default function FacultyPage() {
   };
 
   /* =========================
-       CREATE & UPDATE
+        CREATE & UPDATE
   ========================= */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -126,13 +134,11 @@ export default function FacultyPage() {
       } else {
         // CREATE New
         const res = await api.post('/university/faculty', form);
-        // Show the generated credentials immediately
         setCredentials(res.data.credentials); 
       }
       
       // Reset Form
       if (!credentials) { 
-        // If we created a user, keep the form open to show credentials, otherwise close
         setShowForm(false); 
       }
       setForm({ name: '', department: '', experience: '' });
@@ -148,7 +154,7 @@ export default function FacultyPage() {
   };
 
   /* =========================
-       DELETE
+        DELETE
   ========================= */
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to remove this faculty member?")) return;
@@ -161,25 +167,26 @@ export default function FacultyPage() {
   };
 
   /* =========================
-       RESET PASSWORD
+        RESET PASSWORD
   ========================= */
   const handleResetPassword = async (id) => {
     if (!window.confirm("Reset password for this user? This will invalidate their old login.")) return;
     try {
-      const res = await api.post(`/university/faculty/reset-password/${id}`);
+      // ✅ Fixed Route and Method: PUT request to /university/faculty/:id/reset-password
+      const res = await api.put(`/university/faculty/${id}/reset-password`);
       setCredentials({
         facultyId: res.data.facultyData.systemId || res.data.facultyData.loginId,
         password: res.data.facultyData.newPassword
       });
-      setShowForm(true); // Open form area to show the new credentials box
-      setIsEditing(false); // Ensure we aren't in edit mode
+      setShowForm(true); 
+      setIsEditing(false); 
     } catch (err) {
       alert('Failed to reset password');
     }
   };
 
   /* =========================
-       PREPARE EDIT
+        PREPARE EDIT
   ========================= */
   const handleEditClick = (fac) => {
     setForm({
@@ -190,15 +197,16 @@ export default function FacultyPage() {
     setCurrentId(fac._id);
     setIsEditing(true);
     setShowForm(true);
-    setCredentials(null); // Hide old credentials if any
+    setCredentials(null); 
   };
 
   /* =========================
-       EXPORT ALL
+        EXPORT ALL
   ========================= */
   const exportAllCredentials = async () => {
     try {
-      const res = await api.get('/university/faculty/export/credentials', { responseType: 'blob' });
+      // ✅ Fixed Route: /university/faculty/export-credentials
+      const res = await api.get('/university/faculty/export-credentials', { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -207,7 +215,7 @@ export default function FacultyPage() {
       link.click();
       link.remove();
     } catch (err) {
-      alert('Export failed');
+      alert('Export failed. Make sure there are faculty records to export.');
     }
   };
 
@@ -217,17 +225,27 @@ export default function FacultyPage() {
     setTimeout(() => setCopiedCred(null), 2000);
   };
 
+  // Filter for Search
+  const filteredFaculty = faculty.filter(fac => 
+    fac.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    fac.facultyId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    fac.department?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   /* =========================
-       UI RENDER
+        UI RENDER
   ========================= */
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto animate-in fade-in duration-500">
 
       {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-        <h1 className="text-3xl font-bold text-gray-800">Manage Faculty</h1>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Manage Faculty</h1>
+          <p className="text-gray-500 mt-1">View and manage teaching staff for your university.</p>
+        </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => {
               setShowForm(!showForm);
@@ -259,7 +277,7 @@ export default function FacultyPage() {
 
       {/* BULK UPLOAD PANEL */}
       {showBulkUpload && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200 mb-6 animate-fade-in">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-green-200 mb-6 animate-in slide-in-from-top-4">
           <h2 className="text-xl font-bold mb-4 text-gray-700">Bulk Upload Faculty</h2>
           <div className="flex flex-col gap-4">
             <button
@@ -284,7 +302,7 @@ export default function FacultyPage() {
               <button
                 onClick={handleBulkUpload}
                 disabled={!csvFile || bulkLoading}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 min-w-[120px]"
               >
                 {bulkLoading ? 'Processing...' : 'Upload'}
               </button>
@@ -295,38 +313,41 @@ export default function FacultyPage() {
 
       {/* CREATE / EDIT / CREDENTIALS FORM */}
       {showForm && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-100 mb-6">
-          <div className="flex justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-700">
-              {credentials ? 'Credentials Generated' : isEditing ? 'Edit Faculty' : 'Add New Faculty'}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-200 mb-8 animate-in slide-in-from-top-4">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+              <BookOpen className="text-blue-600" size={20} />
+              {credentials ? 'Credentials Generated' : isEditing ? 'Edit Faculty Member' : 'Add New Faculty Member'}
             </h2>
-            <button onClick={() => setShowForm(false)}><X size={20} className="text-gray-400 hover:text-red-500"/></button>
+            <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-red-500 transition-colors">
+              <X size={20} />
+            </button>
           </div>
 
           {/* CREDENTIALS BOX (Shows after Create or Reset Password) */}
           {credentials ? (
-            <div className="bg-green-50 border border-green-200 p-4 rounded-lg animate-pulse-once">
-              <p className="text-green-800 font-medium mb-3">
-                Successfully generated credentials. Copy them now, they won't be shown again.
+            <div className="bg-green-50 border border-green-200 p-6 rounded-xl animate-pulse-once">
+              <p className="text-green-800 font-medium mb-4">
+                Successfully generated credentials. Please copy them now, they won't be shown again!
               </p>
               
-              <div className="grid gap-3">
-                <div className="flex justify-between items-center bg-white p-2 rounded border">
-                  <span className="text-sm text-gray-500">ID / Username:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-gray-800">{credentials.facultyId}</span>
-                    <button onClick={() => copyToClipboard(credentials.facultyId)} className="text-gray-400 hover:text-blue-600">
-                      {copiedCred === credentials.facultyId ? <Check size={16} className="text-green-500"/> : <Copy size={16}/>}
+              <div className="grid gap-4">
+                <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-green-100 shadow-sm">
+                  <span className="text-sm font-semibold text-gray-600">ID / Username:</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-gray-900 text-lg">{credentials.facultyId}</span>
+                    <button onClick={() => copyToClipboard(credentials.facultyId)} className="text-gray-400 hover:text-blue-600 p-1">
+                      {copiedCred === credentials.facultyId ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
                     </button>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center bg-white p-2 rounded border">
-                  <span className="text-sm text-gray-500">Password:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-gray-800">{credentials.password}</span>
-                    <button onClick={() => copyToClipboard(credentials.password)} className="text-gray-400 hover:text-blue-600">
-                      {copiedCred === credentials.password ? <Check size={16} className="text-green-500"/> : <Copy size={16}/>}
+                <div className="flex justify-between items-center bg-white p-3 rounded-lg border border-green-100 shadow-sm">
+                  <span className="text-sm font-semibold text-gray-600">Password:</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-gray-900 text-lg">{credentials.password}</span>
+                    <button onClick={() => copyToClipboard(credentials.password)} className="text-gray-400 hover:text-blue-600 p-1">
+                      {copiedCred === credentials.password ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
                     </button>
                   </div>
                 </div>
@@ -334,50 +355,59 @@ export default function FacultyPage() {
 
               <button 
                 onClick={() => { setCredentials(null); setShowForm(false); }}
-                className="mt-4 w-full bg-green-600 text-white py-2 rounded hover:bg-green-700"
+                className="mt-6 w-full bg-green-600 text-white py-2.5 rounded-lg hover:bg-green-700 font-medium transition-colors"
               >
                 Done
               </button>
             </div>
           ) : (
             /* INPUT FORM */
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  placeholder="Full Name"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-                <select
-                  value={form.department}
-                  onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Select Department</option>
-                  <option value="Computer Science">Computer Science</option>
-                  <option value="Mechanical">Mechanical</option>
-                  <option value="Electrical">Electrical</option>
-                  <option value="Civil">Civil</option>
-                </select>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                  <input
+                    placeholder="e.g. Dr. Sarah Jenkins"
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full border border-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <select
+                    value={form.department}
+                    onChange={(e) => setForm({ ...form, department: e.target.value })}
+                    className="w-full border border-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Select Department</option>
+                    <option value="Computer Science">Computer Science</option>
+                    <option value="Mechanical">Mechanical</option>
+                    <option value="Electrical">Electrical</option>
+                    <option value="Civil">Civil</option>
+                  </select>
+                </div>
               </div>
               
-              <input
-                type="text"
-                placeholder="Experience (e.g., 5 years)"
-                value={form.experience}
-                onChange={(e) => setForm({ ...form, experience: e.target.value })}
-                className="w-full border px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Experience (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 5 years"
+                  value={form.experience}
+                  onChange={(e) => setForm({ ...form, experience: e.target.value })}
+                  className="w-full border border-gray-300 px-4 py-2.5 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium transition-colors"
               >
-                {loading ? 'Processing...' : isEditing ? 'Update Faculty' : 'Create Faculty'}
+                {loading ? 'Processing...' : isEditing ? 'Update Faculty Member' : 'Create Faculty Member'}
               </button>
             </form>
           )}
@@ -385,16 +415,37 @@ export default function FacultyPage() {
       )}
 
       {/* DATA TABLE */}
-      <div className="bg-white rounded-2xl shadow overflow-hidden border border-gray-100">
-        {faculty.length === 0 ? (
-          <div className="p-10 text-center text-gray-500 flex flex-col items-center">
-            <p className="text-lg">No faculty members found.</p>
-            <p className="text-sm">Use the "Add Faculty" or "Bulk Upload" button to get started.</p>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        
+        {/* Search Bar for Table */}
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <input 
+              type="text"
+              placeholder="Search by name, ID, or department..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {loading && faculty.length === 0 ? (
+          <div className="p-12 text-center text-gray-500 flex flex-col items-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+            Loading faculty records...
+          </div>
+        ) : filteredFaculty.length === 0 ? (
+          <div className="p-12 text-center text-gray-500 flex flex-col items-center">
+            <BookOpen className="w-12 h-12 text-gray-300 mb-3" />
+            <p className="text-lg font-medium text-gray-900">No faculty members found.</p>
+            <p className="text-sm mt-1">Adjust your search or add a new faculty member.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="p-4 text-left text-sm font-semibold text-gray-600">Name</th>
                   <th className="p-4 text-left text-sm font-semibold text-gray-600">Faculty ID</th>
@@ -404,13 +455,13 @@ export default function FacultyPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {faculty.map((fac) => (
-                  <tr key={fac._id} className="hover:bg-gray-50 transition">
-                    <td className="p-4 font-medium text-gray-800">{fac.name}</td>
-                    <td className="p-4 text-gray-600 font-mono text-sm">{fac.facultyId}</td>
+                {filteredFaculty.map((fac) => (
+                  <tr key={fac._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-4 font-medium text-gray-900">{fac.name}</td>
+                    <td className="p-4 text-blue-600 font-mono text-sm">{fac.facultyId}</td>
                     <td className="p-4 text-gray-600">
-                      <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
-                        {fac.department}
+                      <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium">
+                        {fac.department || 'N/A'}
                       </span>
                     </td>
                     <td className="p-4 text-gray-600">{fac.experience || '-'}</td>
@@ -419,7 +470,7 @@ export default function FacultyPage() {
                         {/* Edit Button */}
                         <button 
                           onClick={() => handleEditClick(fac)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition"
+                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition"
                           title="Edit Details"
                         >
                           <Edit2 size={18} />
@@ -428,7 +479,7 @@ export default function FacultyPage() {
                         {/* Reset Password Button */}
                         <button 
                           onClick={() => handleResetPassword(fac._id)}
-                          className="p-2 text-amber-600 hover:bg-amber-50 rounded-full transition"
+                          className="p-2 text-amber-600 hover:bg-amber-100 rounded-lg transition"
                           title="Reset Password"
                         >
                           <KeyRound size={18} />
@@ -437,7 +488,7 @@ export default function FacultyPage() {
                         {/* Delete Button */}
                         <button 
                           onClick={() => handleDelete(fac._id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-full transition"
+                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition"
                           title="Delete Faculty"
                         >
                           <Trash2 size={18} />

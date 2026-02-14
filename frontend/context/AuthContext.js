@@ -16,7 +16,8 @@ export function AuthProvider({ children }) {
     const initializeAuth = () => {
       if (typeof window === 'undefined') return;
 
-      const token = localStorage.getItem('token');
+      // ✅ Changed to sessionStorage (Clears when tab closes)
+      const token = sessionStorage.getItem('token');
 
       if (!token) {
         setUser(null);
@@ -26,19 +27,19 @@ export function AuthProvider({ children }) {
 
       try {
         const decoded = jwtDecode(token);
-
         const currentTime = Date.now() / 1000;
 
-        // ❌ Token expired
+        // Token expired
         if (decoded.exp < currentTime) {
           console.warn("Token expired");
-          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'; // Clear cookie
           setUser(null);
           setLoading(false);
           return;
         }
 
-        // ✅ Valid token
+        // Valid token
         setUser({
           id: decoded.id,
           role: decoded.role,
@@ -47,7 +48,8 @@ export function AuthProvider({ children }) {
 
       } catch (error) {
         console.error("Invalid token:", error);
-        localStorage.removeItem('token');
+        sessionStorage.removeItem('token');
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'; // Clear cookie
         setUser(null);
       }
 
@@ -63,7 +65,11 @@ export function AuthProvider({ children }) {
   const login = (token) => {
     if (!token) return;
 
-    localStorage.setItem('token', token);
+    // ✅ Changed to sessionStorage
+    sessionStorage.setItem('token', token);
+
+    // ✅ Removed max-age. This makes it a "Session Cookie" that deletes on browser close.
+    document.cookie = `token=${token}; path=/; SameSite=Lax`;
 
     try {
       const decoded = jwtDecode(token);
@@ -76,7 +82,8 @@ export function AuthProvider({ children }) {
 
     } catch (error) {
       console.error("Login token decode error:", error);
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
+      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
   };
 
@@ -84,33 +91,26 @@ export function AuthProvider({ children }) {
      LOGOUT FUNCTION
   ========================================= */
   const logout = () => {
-    localStorage.removeItem('token');
+    // ✅ Changed to sessionStorage
+    sessionStorage.removeItem('token');
+    
+    // Clear Cookie
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        login,
-        logout,
-        loading
-      }}
-    >
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-/* =========================================
-   CUSTOM HOOK
-========================================= */
 export function useAuth() {
   const context = useContext(AuthContext);
-
   if (!context) {
     throw new Error("useAuth must be used inside AuthProvider");
   }
-
   return context;
 }

@@ -28,18 +28,22 @@ export default function UniversityNotices() {
       setError(null);
 
       // Verify token
-      const token = localStorage.getItem('token');
+      const token = sessionStorage.getItem('token'); // ✅ Using sessionStorage
       if (!token) {
         setError('No authentication token found. Please login again.');
         return;
       }
 
-      const response = await api.get('/university/updates').catch(err => {
+      // ✅ Changed endpoint to match backend: /university/notifications
+      const response = await api.get('/university/notifications').catch(err => {
         console.error('Notices API Error:', err.response?.status, err.response?.data);
         throw new Error(`${err.response?.status || 'Unknown'} - ${err.response?.data?.message || err.message}`);
       });
 
-      const noticesList = Array.isArray(response.data?.data) ? response.data.data : (Array.isArray(response.data) ? response.data : []);
+      const noticesList = Array.isArray(response.data?.data) 
+        ? response.data.data 
+        : (Array.isArray(response.data) ? response.data : []);
+        
       setNotices(noticesList);
     } catch (err) {
       console.error('Failed to fetch notices:', err);
@@ -53,9 +57,11 @@ export default function UniversityNotices() {
     e.preventDefault();
     try {
       if (editingId) {
-        await api.put(`/university/updates/${editingId}`, formData);
+        // ✅ Changed endpoint to match backend
+        await api.put(`/university/notifications/${editingId}`, formData);
       } else {
-        await api.post('/university/updates', formData);
+        // ✅ Changed endpoint to match backend
+        await api.post('/university/notifications', formData);
       }
       setFormData({ title: '', message: '', priority: 'MEDIUM', roleTarget: 'ALL' });
       setEditingId(null);
@@ -69,7 +75,8 @@ export default function UniversityNotices() {
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this notice?')) return;
     try {
-      await api.delete(`/university/updates/${id}`);
+      // ✅ Changed endpoint to match backend
+      await api.delete(`/university/notifications/${id}`);
       await fetchNotices();
     } catch (err) {
       alert('Failed to delete notice');
@@ -149,7 +156,7 @@ export default function UniversityNotices() {
         )}
 
         {/* Filters */}
-        <div className="mb-8 bg-white rounded-lg shadow p-4 flex gap-4">
+        <div className="mb-8 bg-white rounded-lg shadow p-4 flex flex-col md:flex-row gap-4">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-gray-700 mb-2">Filter by Priority</label>
             <select
@@ -189,7 +196,7 @@ export default function UniversityNotices() {
             {filteredNotices.map((notice) => (
               <div
                 key={notice._id}
-                className="bg-white rounded-xl shadow-lg hover:shadow-xl transition border-l-4 border-blue-600 p-6"
+                className="bg-white rounded-xl shadow-sm hover:shadow-md transition border-l-4 border-blue-600 p-6"
               >
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1">
@@ -207,8 +214,8 @@ export default function UniversityNotices() {
                         <span className="text-gray-500 text-xs font-semibold">Inactive</span>
                       )}
                     </div>
-                    <p className="text-gray-700 mb-4">{notice.message}</p>
-                    <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <p className="text-gray-700 mb-4 whitespace-pre-wrap">{notice.message}</p>
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
                       <span className="flex items-center gap-1">
                         <Clock size={14} />
                         {new Date(notice.createdAt).toLocaleDateString()} {new Date(notice.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -241,7 +248,7 @@ export default function UniversityNotices() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 bg-white rounded-xl shadow">
+          <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-gray-200">
             <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-600 text-lg">No notices found. Create one to get started!</p>
             <button
@@ -257,7 +264,7 @@ export default function UniversityNotices() {
       {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full p-8 animate-in slide-in-from-bottom-4">
             <h2 className="text-3xl font-bold text-gray-900 mb-6">
               {editingId ? 'Edit Notice' : 'Create New Notice'}
             </h2>

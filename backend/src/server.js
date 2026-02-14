@@ -44,58 +44,70 @@ const app = express();
 const server = http.createServer(app);
 
 /* =========================
+   SECURITY MIDDLEWARE
+========================= */
+app.use(helmet());
+app.use(morgan("dev"));
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(mongoSanitize());
+app.use(xss());
+
+/* =========================
+   CORS CONFIG (VERY IMPORTANT)
+========================= */
+
+const allowedOrigins = [
+  process.env.CLIENT_URL,                 // production frontend
+  "http://localhost:3000",                // local frontend
+  "http://localhost:3001"
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow Postman, curl, mobile apps
+    if (!origin) return callback(null, true);
+
+    // Allow Vercel preview domains
+    if (origin.includes("vercel.app")) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("CORS not allowed"));
+  },
+  credentials: true
+}));
+
+/* =========================
+   RATE LIMITING
+========================= */
+app.use("/api", rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 1000,
+  message: { message: "Too many requests. Please try again later." }
+}));
+
+/* =========================
    SOCKET.IO SETUP
 ========================= */
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      if (origin.includes("vercel.app")) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error("Socket CORS not allowed"));
+    },
     credentials: true
   }
 });
 
 initSocket(io);
 app.set("io", io);
-
-/* =========================
-   SECURITY & MIDDLEWARE
-========================= */
-app.use(helmet());
-
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  "http://localhost:3000",
-  "http://localhost:3001"
-].filter(Boolean);
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like Postman/curl) or allowed origins
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("CORS not allowed"));
-    }
-  },
-  credentials: true
-}));
-
-// Body Parsers (CRITICAL for Login & File Uploads)
-app.use(express.json({ limit: "10mb" })); 
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
-
-// Data Sanitization against NoSQL Query Injection & XSS
-app.use(mongoSanitize());
-app.use(xss());
-
-// Request Logging
-app.use(morgan("dev"));
-
-// Rate Limiting to prevent brute-force attacks
-app.use("/api", rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Limit each IP to 1000 requests per windowMs
-  message: { message: "Too many requests from this IP, please try again later." }
-}));
 
 /* =========================
    ROUTES
@@ -119,36 +131,44 @@ app.get("/", (req, res) => {
 });
 
 /* =========================
-   DEBUG EMAIL (Optional)
+   TEST EMAIL ROUTE
 ========================= */
 app.post("/test-email", async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "Email required" });
+    if (!email) {
+      return res.status(400).json({ message: "Email required" });
+    }
 
     const { sendOTPEmail } = await import("./services/mail.service.js");
     await sendOTPEmail(email, "123456", "Test User");
 
     res.json({ success: true, message: "Test email sent successfully" });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Email Error:", error);
     res.status(500).json({ message: error.message });
   }
 });
 
 /* =========================
-   ERROR HANDLING
+   404 HANDLER
 ========================= */
-// 404 Route Catcher
 app.use((req, res) => {
-  res.status(404).json({ message: `Route not found: ${req.originalUrl}` });
+  res.status(404).json({
+    success: false,
+    message: `Route not found: ${req.originalUrl}`
+  });
 });
 
-// Global Error Handler
+/* =========================
+   GLOBAL ERROR HANDLER
+========================= */
 app.use((err, req, res, next) => {
   console.error("❌ GLOBAL ERROR:", err.message);
-  res.status(err.status || 500).json({ 
-    message: err.message || "Internal Server Error" 
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error"
   });
 });
 
@@ -158,6 +178,5 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`🚀 Server securely running on port ${PORT}`);
-  console.log(`👉 API Base URL: http://localhost:${PORT}/api`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
