@@ -11,9 +11,23 @@ const subscriptionSchema = new mongoose.Schema(
 
     planName: {
       type: String,
-      enum: ["BASIC", "ADVANCED", "PREMIUM"],
-      default: "BASIC",
+      enum: ["FREE_TRIAL", "BASIC", "ADVANCED", "PREMIUM"],
+      default: "FREE_TRIAL",
       required: true
+    },
+
+    isFreeTrial: {
+      type: Boolean,
+      default: false,
+      description: "Is this subscription using free trial"
+    },
+
+    freeTrialStartDate: Date,
+    freeTrialEndDate: Date,
+    freeTrialDaysRemaining: {
+      type: Number,
+      default: 0,
+      description: "Days remaining in free trial"
     },
 
     studentCount: {

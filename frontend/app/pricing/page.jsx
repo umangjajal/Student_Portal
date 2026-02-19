@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import api from '@/services/api';
-import { Check, Star, Zap, Crown } from 'lucide-react';
+import { Check, Star, Zap, Crown, Gift } from 'lucide-react';
 
 export default function PricingPlans() {
+  const router = useRouter();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
     fetchPlans();
@@ -25,6 +28,8 @@ export default function PricingPlans() {
 
   const getPlanIcon = (planName) => {
     switch(planName) {
+      case 'FREE_TRIAL':
+        return <Gift size={32} className="text-green-500" />;
       case 'BASIC':
         return <Zap size={32} className="text-yellow-500" />;
       case 'ADVANCED':
@@ -33,6 +38,31 @@ export default function PricingPlans() {
         return <Crown size={32} className="text-purple-500" />;
       default:
         return <Zap size={32} />;
+    }
+  };
+
+  const handleClaimFreeTrial = async () => {
+    try {
+      setClaiming(true);
+      const res = await api.post('/subscription/claim-free-trial');
+      alert('🎉 Free trial claimed! Redirecting to dashboard...');
+      setTimeout(() => {
+        router.push('/university/dashboard');
+      }, 2000);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to claim free trial');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleSelectPlan = async (planName) => {
+    try {
+      const res = await api.post('/subscription/select-plan', { planName });
+      alert('Confirmation email sent! Check your email for the acceptance link.');
+      router.push('/university/subscription');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to select plan');
     }
   };
 
@@ -60,9 +90,9 @@ export default function PricingPlans() {
       </div>
 
       {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-7xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
         {plans.length === 0 ? (
-          <div className="col-span-3 text-center text-slate-400">
+          <div className="col-span-full text-center text-slate-400">
             <p className="text-lg">No plans available</p>
           </div>
         ) : (
@@ -70,7 +100,9 @@ export default function PricingPlans() {
             <div
               key={plan._id}
               className={`relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-105 ${
-                plan.badge
+                plan.planName === 'FREE_TRIAL'
+                  ? 'md:col-span-2 lg:col-span-1 ring-2 ring-green-500 shadow-2xl shadow-green-500/20 order-first'
+                  : plan.badge
                   ? 'ring-2 ring-purple-500 shadow-2xl shadow-purple-500/20'
                   : ''
               }`}
@@ -90,6 +122,12 @@ export default function PricingPlans() {
                 </div>
               )}
 
+              {plan.planName === 'FREE_TRIAL' && (
+                <div className="absolute top-0 right-0 px-4 py-1 text-white text-sm font-bold bg-green-600">
+                  🎁 FREE
+                </div>
+              )}
+
               <div className="p-8">
                 {/* Icon */}
                 <div className="mb-6">
@@ -98,49 +136,66 @@ export default function PricingPlans() {
 
                 {/* Plan Name */}
                 <h3 className="text-2xl font-bold text-white mb-2">
-                  {plan.planName}
+                  {plan.planName === 'FREE_TRIAL' ? 'Free Trial' : plan.planName}
                 </h3>
 
                 {/* Description */}
-                {plan.description && (
+                {plan.planName === 'FREE_TRIAL' ? (
+                  <p className="text-slate-300 text-sm mb-6 font-semibold">
+                    30 Days + 100 Free Students
+                  </p>
+                ) : plan.description ? (
                   <p className="text-slate-400 text-sm mb-6">
                     {plan.description}
                   </p>
-                )}
+                ) : null}
 
                 {/* Price */}
                 <div className="mb-8">
                   <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold text-white">
-                      ₹{plan.pricePerStudent}
+                      {plan.planName === 'FREE_TRIAL' ? '₹0' : `₹${plan.pricePerStudent}`}
                     </span>
-                    <span className="text-slate-400">/student/month</span>
+                    <span className="text-slate-400">
+                      {plan.planName === 'FREE_TRIAL' ? '/ free' : '/student/month'}
+                    </span>
                   </div>
-                  <p className="text-slate-500 text-sm mt-2">
-                    {plan.planName === 'BASIC' && '100% of features'}
-                    {plan.planName === 'ADVANCED' && 'All Basic + Advanced features'}
-                    {plan.planName === 'PREMIUM' && 'Everything + Premium support'}
-                  </p>
+                  {plan.planName === 'FREE_TRIAL' && (
+                    <p className="text-slate-400 text-sm mt-2">
+                      30-day full access • No credit card required
+                    </p>
+                  )}
                 </div>
 
                 {/* CTA Button */}
-                <button
-                  className={`w-full py-3 rounded-lg font-bold mb-8 transition-all duration-300 ${
-                    plan.badge
-                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                      : `text-white hover:opacity-80`
-                  }`}
-                  style={
-                    !plan.badge
-                      ? {
-                          backgroundColor: plan.color,
-                          opacity: 0.8
-                        }
-                      : {}
-                  }
-                >
-                  Get Started
-                </button>
+                {plan.planName === 'FREE_TRIAL' ? (
+                  <button
+                    onClick={handleClaimFreeTrial}
+                    disabled={claiming}
+                    className="w-full py-3 rounded-lg font-bold mb-8 bg-green-600 hover:bg-green-700 text-white transition-all duration-300 disabled:opacity-50"
+                  >
+                    {claiming ? 'Claiming...' : '🎉 Claim Free Trial'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSelectPlan(plan.planName)}
+                    className={`w-full py-3 rounded-lg font-bold mb-8 transition-all duration-300 ${
+                      plan.badge
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                        : `text-white hover:opacity-80`
+                    }`}
+                    style={
+                      !plan.badge
+                        ? {
+                            backgroundColor: plan.color,
+                            opacity: 0.8
+                          }
+                        : {}
+                    }
+                  >
+                    Get Started
+                  </button>
+                )}
 
                 {/* Features List */}
                 <div className="space-y-4">

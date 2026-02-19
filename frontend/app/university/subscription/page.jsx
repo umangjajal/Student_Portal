@@ -18,11 +18,14 @@ export default function SubscriptionManagement() {
   const [selectedFee, setSelectedFee] = useState(null);
   const [selectingPlan, setSelectingPlan] = useState(false);
   const [gracePeriodCountdown, setGracePeriodCountdown] = useState({});
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [claiming, setClaiming] = useState(false);
 
   useEffect(() => {
     fetchData();
-    // Refresh data every 10 seconds to show live updates
-    const interval = setInterval(fetchData, 10000);
+    // Refresh data every 30 seconds to show live updates
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -31,15 +34,19 @@ export default function SubscriptionManagement() {
       setLoading(true);
       setError('');
 
-      // Fetch current subscription
-      const subRes = await api.get('/subscription/my-subscription');
-      setSubscription(subRes.data);
+      // Fetch current subscription - may return error if none exists
+      try {
+        const subRes = await api.get('/subscription/my-subscription');
+        setSubscription(subRes.data);
+      } catch (subErr) {
+        // No subscription exists yet - this is normal
+        setSubscription(null);
+      }
 
       // Fetch all plans
       const plansRes = await api.get('/subscription/pricing-plans');
       setAllPlans(plansRes.data.data || []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load subscription data');
       console.error(err);
     } finally {
       setLoading(false);
@@ -75,9 +82,61 @@ export default function SubscriptionManagement() {
     }
   };
 
+  const handleUpgradeFromFreeTrial = async (newPlan) => {
+    try {
+      setUpgrading(true);
+      setError('');
+      setSuccess('');
+
+      const res = await api.post('/subscription/upgrade-from-trial', {
+        newPlan
+      });
+
+      setSuccess(`Upgraded to ${newPlan} plan! Please complete payment within 5 days.`);
+      setShowUpgradeModal(false);
+      setTimeout(() => fetchData(), 2000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upgrade');
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const handleClaimFreeTrial = async () => {
+    try {
+      setClaiming(true);
+      setError('');
+      setSuccess('');
+
+      await api.post('/subscription/claim-free-trial');
+      setSuccess('🎉 Free trial claimed! Fetching your subscription...');
+      setTimeout(() => fetchData(), 2000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to claim free trial');
+    } finally {
+      setClaiming(false);
+    }
+  };
+
+  const handleSelectPlan = async (planName) => {
+    try {
+      setSelectingPlan(true);
+      setError('');
+      setSuccess('');
+
+      await api.post('/subscription/select-plan', { planName });
+      setSuccess('✅ Confirmation email sent! Check your email for the acceptance link.');
+      setTimeout(() => fetchData(), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to select plan');
+    } finally {
+      setSelectingPlan(false);
+    }
+  };
+
   const generateQRCode = (amount) => {
     // UPI payment QR code format
-    const upiId = "universityaccount@axis";
+    const upiId = "umangjajal@oksbi";
     const payeeName = "Student Portal";
     const transactionRef = `UNIV-${Date.now()}`;
     
@@ -121,8 +180,215 @@ export default function SubscriptionManagement() {
         </div>
       )}
 
-      {subscription && (
-        <>
+      {!subscription ? (
+        // NO SUBSCRIPTION - Show available plans
+        <div className="space-y-8">
+          <div className="bg-red-50 border border-red-300 rounded-2xl p-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle size={24} className="text-red-600" />
+              <div>
+                <h3 className="text-lg font-bold text-red-900">No Active Subscription</h3>
+                <p className="text-red-800">Activate a subscription plan to get started with your institution.</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">📋 Choose Your Plan</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {allPlans && allPlans.length > 0 ? (
+                allPlans.map((plan) => (
+                  <div
+                    key={plan._id}
+                    className={`rounded-2xl p-6 border-2 transition-all hover:shadow-lg ${
+                      plan.planName === 'FREE_TRIAL'
+                        ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-400'
+                        : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    {/* Badge */}
+                    {plan.badge && (
+                      <div className="mb-3 inline-block px-3 py-1 bg-blue-600 text-white text-xs font-bold rounded-full">
+                        {plan.badge}
+                      </div>
+                    )}
+
+                    {plan.planName === 'FREE_TRIAL' && (
+                      <div className="mb-3 inline-block px-3 py-1 bg-green-600 text-white text-xs font-bold rounded-full">
+                        🎁 FREE
+                      </div>
+                    )}
+
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                      {plan.planName === 'FREE_TRIAL' ? 'Free Trial' : plan.planName}
+                    </h3>
+
+                    {plan.planName === 'FREE_TRIAL' ? (
+                      <div className="mb-4">
+                        <p className="text-sm text-gray-700 mb-2">
+                          <strong>30 Days</strong> + <strong>100 Students</strong>
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          No credit card required • Full feature access
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mb-4">
+                        <div className="text-3xl font-bold text-gray-900 mb-1">
+                          ₹{plan.pricePerStudent}
+                        </div>
+                        <p className="text-sm text-gray-600">per student/month</p>
+                      </div>
+                    )}
+
+                    {/* Features */}
+                    <div className="space-y-2 mb-6 text-sm">
+                      {plan.features.studentManagement && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Student Management
+                        </div>
+                      )}
+                      {plan.features.attendanceTracking && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Attendance Tracking
+                        </div>
+                      )}
+                      {plan.features.feeManagement && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Fee Management
+                        </div>
+                      )}
+                      {plan.features.advancedAnalytics && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Advanced Analytics
+                        </div>
+                      )}
+                    </div>
+
+                    {/* CTA Button */}
+                    {plan.planName === 'FREE_TRIAL' ? (
+                      <button
+                        onClick={() => handleClaimFreeTrial()}
+                        className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition-all"
+                      >
+                        Claim Free Trial
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSelectPlan(plan.planName)}
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-all"
+                      >
+                        Select Plan
+                      </button>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full text-center py-12">
+                  <p className="text-gray-600 font-semibold">No plans available</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {/* HAS SUBSCRIPTION - Show current details */}
+          {/* Free Trial Active Alert */}
+          {subscription.subscription.isFreeTrial && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-300 rounded-2xl shadow-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <div className="text-4xl">🎁</div>
+                  <div>
+                    <h3 className="text-lg font-bold text-green-900 mb-2">
+                      🎉 Free Trial Active: {subscription.subscription.freeTrialDaysRemaining} Days Remaining
+                    </h3>
+                    <p className="text-green-800 mb-4">
+                      You have <strong>100 free students</strong> and <strong>30 days of full access</strong>! 
+                      After your trial ends, upgrade to any paid plan to continue.
+                    </p>
+                    <div className="flex gap-3">
+                      <Link 
+                        href="/university/subscription/grace-period"
+                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition"
+                      >
+                        Add Students Now
+                      </Link>
+                      <button
+                        onClick={() => setShowUpgradeModal(true)}
+                        className="px-4 py-2 bg-green-900 hover:bg-green-950 text-white font-semibold rounded-lg transition"
+                      >
+                        Upgrade Plan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grace Period Alert */}
+          {subscription.subscription.status === 'GRACE_PERIOD' && !subscription.subscription.isFreeTrial && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-300 rounded-2xl shadow-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <Clock className="w-6 h-6 text-orange-600 flex-shrink-0 mt-1" />
+                  <div>
+                    <h3 className="text-lg font-bold text-amber-900 mb-2">
+                      ⏳ Grace Period Active: {subscription.subscription.gracePeriodDaysRemaining} Days Remaining
+                    </h3>
+                    <p className="text-amber-800 mb-4">
+                      Complete your setup and make payment by <strong>{new Date(subscription.subscription.paymentDueDate).toLocaleDateString()}</strong>
+                    </p>
+                    <div className="flex gap-3">
+                      <Link 
+                        href="/university/subscription/grace-period"
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-semibold rounded-lg transition flex items-center gap-2"
+                      >
+                        <TrendingUp size={18} />
+                        Go to Grace Period Dashboard
+                      </Link>
+                      <button
+                        onClick={() => setShowPaymentModal(true)}
+                        className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition"
+                      >
+                        Make Payment Now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Overdue Alert */}
+          {subscription.subscription.status === 'PAYMENT_OVERDUE' && (
+            <div className="mb-8 p-6 bg-gradient-to-r from-red-50 to-pink-50 border border-red-300 rounded-2xl shadow-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-4">
+                  <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+                  <div>
+                    <h3 className="text-lg font-bold text-red-900 mb-2">🚨 Payment Overdue</h3>
+                    <p className="text-red-800 mb-4">
+                      Your payment deadline has passed. Your subscription is now marked as OVERDUE. Please make the payment immediately to avoid service interruption.
+                    </p>
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition"
+                    >
+                      Pay Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Live Counter - Students & Faculty */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             {/* Students Counter */}
@@ -361,7 +627,7 @@ export default function SubscriptionManagement() {
               })}
             </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* Payment Modal */}
@@ -464,7 +730,7 @@ export default function SubscriptionManagement() {
               <div className="mt-8 flex gap-4">
                 <button
                   onClick={() => {
-                    const upiId = "universityaccount@axis";
+                    const upiId = "umangjajal@oksbi";
                     const upiString = `upi://pay?pa=${upiId}&pn=StudentPortal&am=${subscription.monthlyCharges}&tn=UniversitySubscription`;
                     window.location.href = upiString;
                   }}
@@ -478,6 +744,92 @@ export default function SubscriptionManagement() {
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade from Free Trial Modal */}
+      {showUpgradeModal && subscription && subscription.subscription.isFreeTrial && allPlans && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 sticky top-0 flex justify-between items-center">
+              <h3 className="text-2xl font-bold">🚀 Upgrade Your Plan</h3>
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="text-2xl font-bold hover:opacity-80"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-8">
+              <p className="text-gray-600 mb-6">
+                Your free trial gives you access to all features. Choose a paid plan to continue after your trial ends.
+              </p>
+
+              <div className="space-y-4">
+                {allPlans.filter(p => !p.isFreeTrial).map((plan) => (
+                  <div
+                    key={plan._id}
+                    className="border-2 border-gray-200 rounded-xl p-6 hover:border-blue-500 transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h4 className="text-xl font-bold text-gray-900">{plan.planName}</h4>
+                        <p className="text-gray-600 text-sm">{plan.description || ''}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-gray-900">
+                          ₹{plan.pricePerStudent}
+                        </div>
+                        <p className="text-gray-500 text-sm">/student/month</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
+                      {plan.features.studentManagement && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Student Management
+                        </div>
+                      )}
+                      {plan.features.attendanceTracking && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Attendance
+                        </div>
+                      )}
+                      {plan.features.feeManagement && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Fee Management
+                        </div>
+                      )}
+                      {plan.features.advancedAnalytics && (
+                        <div className="flex items-center gap-2 text-gray-700">
+                          <Check size={16} className="text-green-600" />
+                          Advanced Analytics
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handleUpgradeFromFreeTrial(plan.planName)}
+                      disabled={upgrading}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold rounded-lg transition"
+                    >
+                      {upgrading ? 'Processing...' : `Upgrade to ${plan.planName}`}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-gray-700">
+                  <strong>📝 Note:</strong> After upgrading, you'll have 5 days to complete your payment. No charges during the process if you cancel.
+                </p>
               </div>
             </div>
           </div>

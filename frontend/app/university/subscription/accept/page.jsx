@@ -31,9 +31,9 @@ export default function AcceptSubscriptionPage() {
         setSuccess(true);
         setSubscription(response.data.subscription);
         
-        // Redirect to subscription page after 5 seconds
+        // Redirect to grace period dashboard after 5 seconds
         setTimeout(() => {
-          router.push('/university/subscription');
+          router.push('/university/subscription/grace-period');
         }, 5000);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to accept subscription. The link may have expired.');
@@ -159,8 +159,8 @@ export default function AcceptSubscriptionPage() {
 
             {/* Action Buttons */}
             <div className="flex gap-4">
-              <Link href="/university/subscription" className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:shadow-lg transition font-semibold text-center">
-                Go to Subscription Dashboard
+              <Link href="/university/subscription/grace-period" className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-xl hover:shadow-lg transition font-semibold text-center">
+                Go to Grace Period Dashboard
               </Link>
               <Link href="/university/dashboard" className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl hover:shadow-lg transition font-semibold text-center">
                 Go to Dashboard
@@ -169,7 +169,7 @@ export default function AcceptSubscriptionPage() {
 
             {/* Auto-redirect notice */}
             <p className="text-center text-sm text-gray-400">
-              Redirecting to subscription page in 5 seconds...
+              Redirecting to grace period dashboard in 5 seconds...
             </p>
           </div>
         )}

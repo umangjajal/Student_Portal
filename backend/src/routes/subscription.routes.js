@@ -16,7 +16,12 @@ import {
   selectPlanAndInitiate,
   acceptSubscription,
   getSubscriptionWithGracePeriod,
-  sendGracePeriodReminders
+  sendGracePeriodReminders,
+  confirmPayment,
+  getGracePeriodProgress,
+  extendGracePeriod,
+  claimFreeTrial,
+  upgradeFromFreeTrial
 } from "../controllers/subscription.controller.js";
 
 const router = express.Router();
@@ -45,6 +50,22 @@ router.post(
   auth,
   roleCheck("UNIVERSITY"),
   selectPlanAndInitiate
+);
+
+// NEW: Claim free trial (instant activation, no email)
+router.post(
+  "/claim-free-trial",
+  auth,
+  roleCheck("UNIVERSITY"),
+  claimFreeTrial
+);
+
+// NEW: Upgrade from free trial to paid plan
+router.post(
+  "/upgrade-from-trial",
+  auth,
+  roleCheck("UNIVERSITY"),
+  upgradeFromFreeTrial
 );
 
 // NEW: Get subscription with grace period info
@@ -83,6 +104,22 @@ router.get(
   getInvoices
 );
 
+// NEW: Confirm Payment
+router.post(
+  "/confirm-payment",
+  auth,
+  roleCheck("UNIVERSITY"),
+  confirmPayment
+);
+
+// NEW: Get grace period progress
+router.get(
+  "/progress/grace-period",
+  auth,
+  roleCheck("UNIVERSITY"),
+  getGracePeriodProgress
+);
+
 /* =========================
    ADMIN ROUTES
 ========================= */
@@ -99,6 +136,14 @@ router.post(
   auth,
   roleCheck("ADMIN"),
   sendGracePeriodReminders
+);
+
+// NEW: Extend grace period (emergency extension)
+router.post(
+  "/admin/extend-grace-period",
+  auth,
+  roleCheck("ADMIN"),
+  extendGracePeriod
 );
 
 router.put(

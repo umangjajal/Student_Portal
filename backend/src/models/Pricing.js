@@ -4,7 +4,7 @@ const pricingSchema = new mongoose.Schema(
   {
     planName: {
       type: String,
-      enum: ["BASIC", "ADVANCED", "PREMIUM"],
+      enum: ["FREE_TRIAL", "BASIC", "ADVANCED", "PREMIUM"],
       required: true,
       unique: true
     },
@@ -13,6 +13,24 @@ const pricingSchema = new mongoose.Schema(
       type: Number,
       required: true,
       description: "Price per student per month (in rupees)"
+    },
+
+    isFreeTrial: {
+      type: Boolean,
+      default: false,
+      description: "Is this a free trial plan"
+    },
+
+    freeTrialDays: {
+      type: Number,
+      default: 0,
+      description: "Number of free trial days (30 for free trial)"
+    },
+
+    freeTrialMaxStudents: {
+      type: Number,
+      default: 0,
+      description: "Maximum students in free trial (100)"
     },
 
     description: String,
