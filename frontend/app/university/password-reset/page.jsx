@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/services/api';
-import { KeyRound, ShieldCheck, Mail, AlertCircle, ArrowRight } from 'lucide-react';
+import { KeyRound, ShieldCheck, Mail, AlertCircle, ArrowRight, Clock } from 'lucide-react';
 
 export default function PasswordReset() {
   const router = useRouter();
@@ -24,8 +24,8 @@ export default function PasswordReset() {
     setLoading(true);
 
     try {
-      // ✅ Corrected route to match backend
-      const response = await api.post('/university/request-password-reset');
+      // ✅ Fixed route to match backend: /api/university/password/request-reset
+      const response = await api.post('/university/password/request-reset');
       setEmail(response.data.email);
       setSuccess('OTP sent to your email!');
       setStep('verify');
@@ -55,8 +55,8 @@ export default function PasswordReset() {
     setLoading(true);
 
     try {
-      // ✅ Corrected route to match backend
-      await api.post('/university/verify-reset-password', {
+      // ✅ Fixed route to match backend: /api/university/password/verify-otp
+      await api.post('/university/password/verify-otp', {
         otp,
         newPassword
       });

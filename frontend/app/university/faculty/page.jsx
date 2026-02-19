@@ -91,8 +91,8 @@ export default function FacultyPage() {
     formData.append('file', csvFile);
 
     try {
-      // ✅ Fixed Route: Matches backend exactly (/university/faculty/bulk-upload)
-      const res = await api.post('/university/faculty/bulk-upload', formData, {
+      // ✅ Fixed Route to match backend: /university/faculty/bulk/upload
+      const res = await api.post('/university/faculty/bulk/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         responseType: 'blob' 
       });

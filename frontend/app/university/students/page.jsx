@@ -86,8 +86,8 @@ export default function StudentPage() {
     formData.append('file', csvFile);
 
     try {
-      // ✅ Fixed Route to match backend
-      const res = await api.post('/university/students/bulk-upload', formData, {
+      // ✅ Fixed Route to match backend: /university/students/bulk/upload
+      const res = await api.post('/university/students/bulk/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         responseType: 'blob' 
       });

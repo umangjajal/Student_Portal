@@ -31,6 +31,7 @@ import universityRoutes from "./routes/university.routes.js";
 import studentRoutes from "./routes/student.routes.js";
 import facultyRoutes from "./routes/faculty.routes.js";
 import otpRoutes from "./routes/otp.routes.js";
+import subscriptionRoutes from "./routes/subscription.routes.js";
 
 /* =========================
    CONNECT DB
@@ -118,6 +119,7 @@ app.use("/api/university", universityRoutes);
 app.use("/api/student", studentRoutes);
 app.use("/api/faculty", facultyRoutes);
 app.use("/api/otp", otpRoutes);
+app.use("/api/subscription", subscriptionRoutes);
 
 /* =========================
    HEALTH CHECK

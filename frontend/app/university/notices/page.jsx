@@ -28,7 +28,7 @@ export default function UniversityNotices() {
       setError(null);
 
       // Verify token
-      const token = sessionStorage.getItem('token'); // ✅ Using sessionStorage
+      const token = localStorage.getItem('token'); // ✅ Using localStorage
       if (!token) {
         setError('No authentication token found. Please login again.');
         return;

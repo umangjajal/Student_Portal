@@ -3,8 +3,44 @@ import Student from "../models/Student.js";
 import Notification from "../models/Notification.js";
 
 export const getAttendance = async (req, res) => {
-  const records = await Attendance.find({ studentId: req.user.id });
-  res.json(records);
+  try {
+    // Get student data with department and year
+    const student = await Student.findById(req.user.referenceId);
+    if (!student) {
+      return res.status(404).json({ message: "Student record not found" });
+    }
+
+    // Fetch attendance records for this student
+    const records = await Attendance.find({ studentId: student._id })
+      .populate('facultyId', 'name department')
+      .sort({ date: -1 });
+
+    // Calculate statistics
+    const total = records.length;
+    const present = records.filter(r => r.status === 'PRESENT').length;
+    const absent = records.filter(r => r.status === 'ABSENT').length;
+    const percentage = total > 0 ? ((present / total) * 100).toFixed(2) : 0;
+
+    res.json({
+      message: "Attendance records retrieved successfully",
+      student: {
+        name: student.name,
+        enrollmentNo: student.enrollmentNo,
+        department: student.department,
+        year: student.year
+      },
+      statistics: {
+        total,
+        present,
+        absent,
+        percentage: parseFloat(percentage)
+      },
+      records
+    });
+  } catch (error) {
+    console.error("Get Attendance Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch attendance records" });
+  }
 };
 
 /* =========================

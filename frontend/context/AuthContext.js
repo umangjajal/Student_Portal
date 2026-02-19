@@ -16,8 +16,8 @@ export function AuthProvider({ children }) {
     const initializeAuth = () => {
       if (typeof window === 'undefined') return;
 
-      // ✅ Changed to sessionStorage (Clears when tab closes)
-      const token = sessionStorage.getItem('token');
+      // ✅ Using localStorage consistently across app
+      const token = localStorage.getItem('token');
 
       if (!token) {
         setUser(null);
@@ -32,7 +32,7 @@ export function AuthProvider({ children }) {
         // Token expired
         if (decoded.exp < currentTime) {
           console.warn("Token expired");
-          sessionStorage.removeItem('token');
+          localStorage.removeItem('token');
           document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'; // Clear cookie
           setUser(null);
           setLoading(false);
@@ -48,7 +48,7 @@ export function AuthProvider({ children }) {
 
       } catch (error) {
         console.error("Invalid token:", error);
-        sessionStorage.removeItem('token');
+        localStorage.removeItem('token');
         document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'; // Clear cookie
         setUser(null);
       }
@@ -65,10 +65,8 @@ export function AuthProvider({ children }) {
   const login = (token) => {
     if (!token) return;
 
-    // ✅ Changed to sessionStorage
-    sessionStorage.setItem('token', token);
-
-    // ✅ Removed max-age. This makes it a "Session Cookie" that deletes on browser close.
+    // ✅ Using localStorage consistently
+    localStorage.setItem('token', token);
     document.cookie = `token=${token}; path=/; SameSite=Lax`;
 
     try {
@@ -82,7 +80,7 @@ export function AuthProvider({ children }) {
 
     } catch (error) {
       console.error("Login token decode error:", error);
-      sessionStorage.removeItem('token');
+      localStorage.removeItem('token');
       document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     }
   };
@@ -91,8 +89,8 @@ export function AuthProvider({ children }) {
      LOGOUT FUNCTION
   ========================================= */
   const logout = () => {
-    // ✅ Changed to sessionStorage
-    sessionStorage.removeItem('token');
+    // ✅ Using localStorage consistently
+    localStorage.removeItem('token');
     
     // Clear Cookie
     document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';

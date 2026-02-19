@@ -5,6 +5,7 @@ export default function auth(req, res, next) {
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({
+      success: false,
       message: "Unauthorized - No token provided"
     });
   }
@@ -17,12 +18,20 @@ export default function auth(req, res, next) {
       process.env.JWT_SECRET
     );
 
-    req.user = decoded; // Attaches { id, role, referenceId } to request
+    // Attach standardized user object
+    req.user = {
+      id: decoded.id,
+      role: decoded.role,
+      referenceId: decoded.referenceId
+    };
 
     next();
+
   } catch (error) {
     console.error("JWT Error:", error.message);
+
     return res.status(401).json({
+      success: false,
       message: "Invalid or expired token"
     });
   }

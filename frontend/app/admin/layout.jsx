@@ -54,7 +54,7 @@ export default function AdminLayout({ children }) {
 
       // 3. CHECK LOCAL STORAGE (Fallback for Refresh/SSR)
       if (typeof window !== "undefined") {
-        const token = sessionStorage.getItem("token");
+        const token = localStorage.getItem("token");
 
         if (token) {
           try {
@@ -67,7 +67,7 @@ export default function AdminLayout({ children }) {
               setIsChecking(false);
               return;
             } else if (decoded.exp <= currentTime) {
-               sessionStorage.removeItem("token");
+               localStorage.removeItem("token");
                document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
                router.replace("/auth/login");
                return;
@@ -76,7 +76,7 @@ export default function AdminLayout({ children }) {
               return;
             }
           } catch (err) {
-            sessionStorage.removeItem("token");
+            localStorage.removeItem("token");
             document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           }
         }
@@ -95,7 +95,7 @@ export default function AdminLayout({ children }) {
       contextLogout();
     } else {
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("token"); // ✅ Changed to sessionStorage
+        localStorage.removeItem("token"); // ✅ Using localStorage
         document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       }
     }
