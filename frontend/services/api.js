@@ -1,27 +1,49 @@
 import axios from "axios";
 
+// Detect environment
+const isProduction = process.env.NODE_ENV === "production";
+
+// Base URL logic
+const baseURL = isProduction
+  ? process.env.NEXT_PUBLIC_API_URL || "https://your-backend-name.onrender.com/api"
+  : "http://localhost:5000/api";
+
+// Create axios instance
 const api = axios.create({
-  // Ensure this matches your backend URL perfectly
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api",
+  baseURL,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// This interceptor automatically attaches the token to EVERY request
+// Attach token automatically
 api.interceptors.request.use(
   (config) => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("token");
-      
-      // Make sure token exists and isn't just the string "undefined"
+
       if (token && token !== "undefined" && token !== "null") {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
     return config;
   },
+  (error) => Promise.reject(error)
+);
+
+// Global response error handler (helps debugging)
+api.interceptors.response.use(
+  (response) => response,
   (error) => {
+    if (!error.response) {
+      console.error("Backend not reachable or server down.");
+    } else {
+      console.error(
+        "API Error:",
+        error.response.status,
+        error.response.data
+      );
+    }
     return Promise.reject(error);
   }
 );
